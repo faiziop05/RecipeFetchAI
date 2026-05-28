@@ -85,7 +85,10 @@ export default function PreferencesScreen() {
     setRestoring(true);
     try {
       const customerInfo = await Purchases.restorePurchases();
-      if (customerInfo.entitlements.active['premium'] !== undefined) {
+      const hasPremium = customerInfo.entitlements.active['premium'] !== undefined || 
+                         customerInfo.entitlements.active['pro'] !== undefined;
+      
+      if (hasPremium) {
         dispatch(setPremiumStatus(true));
         showAlert("Premium Restored", "Your active Premium subscription has been successfully restored!", "success");
       } else {
