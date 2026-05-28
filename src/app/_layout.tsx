@@ -84,13 +84,12 @@ function RootLayoutNav() {
   // RevenueCat SDK Initialization
   useEffect(() => {
     Purchases.setLogLevel(LOG_LEVEL.DEBUG);
-    // TODO: Replace with real API keys before production release
     const apiKey = Platform.select({
-      ios: "appl_api_key_placeholder",
-      android: "goog_api_key_placeholder",
+      ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || "appl_api_key_placeholder",
+      android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY || "goog_api_key_placeholder",
     });
     
-    if (apiKey) {
+    if (apiKey && apiKey !== "appl_api_key_placeholder" && apiKey !== "goog_api_key_placeholder") {
       Purchases.configure({ apiKey });
     }
   }, []);
