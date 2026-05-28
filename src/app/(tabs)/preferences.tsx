@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, Switch, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { StyleSheet, View, Text, Switch, ScrollView, TouchableOpacity, Modal, Linking, Platform } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { signOut } from 'firebase/auth';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import Purchases from 'react-native-purchases';
 
 import { RootState } from '@/store';
 import { ThemeColors } from '@/theme/colors';
@@ -12,6 +14,7 @@ import { ActionButton } from '@/components/ActionButton';
 import { auth } from '@/services/firebase';
 import { toggleTheme } from '@/store/themeSlice';
 import { logout } from '@/store/authSlice';
+import { setPremiumStatus } from '@/store/subscriptionSlice';
 import { CustomAlert } from '@/components/CustomAlert';
 
 const PRIVACY_POLICY = `Privacy Policy
@@ -54,11 +57,48 @@ In no event shall RecipeFetch AI be liable for any indirect, incidental, or cons
 
 export default function PreferencesScreen() {
   const dispatch = useDispatch();
+  const router = useRouter();
   const mode = useSelector((state: RootState) => state.theme.mode);
   const colors = ThemeColors[mode];
 
   const userEmail = useSelector((state: RootState) => state.auth.email);
   const userId = useSelector((state: RootState) => state.auth.uid);
+  
+  const isPremium = useSelector((state: RootState) => state.subscription.isPremium);
+  const freeScansUsed = useSelector((state: RootState) => state.subscription.freeScansUsed);
+  const [restoring, setRestoring] = useState(false);
+
+  const handleManageSubscription = () => {
+    const url = Platform.select({
+      ios: "https://apps.apple.com/account/subscriptions",
+      android: "https://play.google.com/store/account/subscriptions",
+    });
+    if (url) {
+      Linking.openURL(url).catch((err) => {
+        console.error("Failed to open subscriptions URL:", err);
+        showAlert("Failed to Open Link", "Could not open store subscription settings. Please check that the Google Play Store app is installed.", "error");
+      });
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    setRestoring(true);
+    try {
+      const customerInfo = await Purchases.restorePurchases();
+      if (customerInfo.entitlements.active['premium'] !== undefined) {
+        dispatch(setPremiumStatus(true));
+        showAlert("Premium Restored", "Your active Premium subscription has been successfully restored!", "success");
+      } else {
+        dispatch(setPremiumStatus(false));
+        showAlert("No Active Subscription", "We couldn't find an active Premium subscription for this Google Play account.", "info");
+      }
+    } catch (e: any) {
+      console.error(e);
+      showAlert("Restoration Failed", e.message || "Failed to restore your purchases. Please try again later.", "error");
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const [legalModalVisible, setLegalModalVisible] = useState(false);
   const [legalContent, setLegalContent] = useState({ title: '', text: '' });
@@ -146,6 +186,52 @@ export default function PreferencesScreen() {
               </View>
             </View>
           </CardContainer>
+
+          {/* Subscription Section */}
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Subscription</Text>
+          {isPremium ? (
+            <CardContainer style={styles.accountCard}>
+              <View style={styles.accountHeader}>
+                <View style={[styles.avatarBadge, { backgroundColor: '#FFCC00' }]}>
+                  <Ionicons name="sparkles" size={24} color={colors.background} />
+                </View>
+                <View style={styles.accountTextContainer}>
+                  <Text style={[styles.emailVal, { color: colors.textPrimary }]}>Premium Active</Text>
+                  <Text style={[styles.uidVal, { color: '#FFCC00', fontWeight: 'bold' }]}>Unlimited Scans Enabled</Text>
+                </View>
+              </View>
+              <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 14 }} />
+              <TouchableOpacity style={styles.subActionRow} onPress={handleManageSubscription}>
+                <Text style={[styles.subActionLabel, { color: colors.textPrimary }]}>Manage Subscription</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </CardContainer>
+          ) : (
+            <CardContainer style={styles.accountCard}>
+              <View style={styles.accountHeader}>
+                <View style={[styles.avatarBadge, { backgroundColor: colors.textSecondary }]}>
+                  <Ionicons name="star-outline" size={24} color={colors.background} />
+                </View>
+                <View style={styles.accountTextContainer}>
+                  <Text style={[styles.emailVal, { color: colors.textPrimary }]}>Free Account</Text>
+                  <Text style={[styles.uidVal, { color: colors.textSecondary }]}>
+                    {freeScansUsed} / 3 free scans used this month
+                  </Text>
+                </View>
+              </View>
+              <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 14 }} />
+              <TouchableOpacity style={[styles.subActionRow, { marginBottom: 12 }]} onPress={() => router.push('/paywall')}>
+                <Text style={[styles.subActionLabel, { color: colors.primaryAccent, fontWeight: 'bold' }]}>Upgrade to Premium</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.primaryAccent} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.subActionRow} onPress={handleRestorePurchases} disabled={restoring}>
+                <Text style={[styles.subActionLabel, { color: colors.textPrimary }]}>
+                  {restoring ? 'Restoring...' : 'Restore Purchases'}
+                </Text>
+                <Ionicons name="refresh" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </CardContainer>
+          )}
 
           {/* Preferences */}
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>App Preferences</Text>
@@ -409,5 +495,15 @@ const styles = StyleSheet.create({
   },
   modalFooterSpacer: {
     height: 60,
+  },
+  subActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  subActionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
