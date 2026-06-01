@@ -183,6 +183,7 @@ function RootLayoutNav() {
             headerShown: false,
           }} 
         />
+        <Stack.Screen name="manual-recipe" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );
