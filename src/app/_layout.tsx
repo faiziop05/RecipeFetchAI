@@ -101,36 +101,43 @@ function RootLayoutNav() {
     if (!isReady) return;
 
     const currentSegment = segments[0];
+    let isRedirecting = false;
 
     // 1. Force onboarding if not completed
     if (!hasCompletedOnboarding) {
       if (currentSegment !== 'onboarding') {
         router.replace('/onboarding');
+        isRedirecting = true;
       }
-      return;
     }
-
     // 2. Prevent visiting onboarding if already completed
-    if (hasCompletedOnboarding && currentSegment === 'onboarding') {
+    else if (hasCompletedOnboarding && currentSegment === 'onboarding') {
       router.replace(isLoggedIn ? '/(tabs)/capture' : '/login');
-      return;
+      isRedirecting = true;
     }
-
     // 3. Authenticated route guarding
-    const inAuthGroup = currentSegment === '(tabs)' || currentSegment === 'recipe-display';
+    else {
+      const inAuthGroup = currentSegment === '(tabs)' || currentSegment === 'recipe-display';
 
-    if (!isLoggedIn && inAuthGroup) {
-      // Redirect unauthenticated user to login screen
-      router.replace('/login');
-    } else if (isLoggedIn && (currentSegment === 'login' || currentSegment === undefined)) {
-      // Redirect logged in user to capture engine
-      router.replace('/(tabs)/capture');
+      if (!isLoggedIn && inAuthGroup) {
+        // Redirect unauthenticated user to login screen
+        router.replace('/login');
+        isRedirecting = true;
+      } else if (isLoggedIn && (currentSegment === 'login' || currentSegment === undefined)) {
+        // Redirect logged in user to capture engine
+        router.replace('/(tabs)/capture');
+        isRedirecting = true;
+      }
     }
 
     // Hide splash screen smoothly now that routing is resolved
-    setTimeout(() => {
-      SplashScreen.hideAsync();
-    }, 100);
+    if (!isRedirecting) {
+      setTimeout(() => {
+        SplashScreen.hideAsync().catch((err) => {
+          console.warn("[Splash] Failed to hide splash screen:", err);
+        });
+      }, 100);
+    }
 
   }, [isLoggedIn, hasCompletedOnboarding, segments, isReady, router]);
 
