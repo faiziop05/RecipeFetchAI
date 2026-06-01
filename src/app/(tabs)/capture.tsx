@@ -570,6 +570,55 @@ export default function CaptureScreen() {
               </TouchableOpacity>
             </View>
           )}
+
+          {/* Manual Creation Card */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[
+              styles.manualInputCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+              colors.cardShadow,
+            ]}
+            onPress={() => router.push('/manual-recipe')}
+          >
+            <View style={styles.manualRow}>
+              <View
+                style={[
+                  styles.scannerIconWrapper,
+                  {
+                    backgroundColor:
+                      mode === "light"
+                        ? "rgba(0,0,0,0.03)"
+                        : "rgba(255,255,255,0.04)",
+                    borderColor: colors.border,
+                    marginRight: 14,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={20}
+                  color={colors.primaryAccent}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.scannerLabel, { color: colors.textPrimary }]}>
+                  Manual Creation
+                </Text>
+                <Text style={[styles.scannerSublabel, { color: colors.textSecondary }]}>
+                  Type raw recipe details and let AI format them
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Premium Submit Button */}
@@ -860,5 +909,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 6,
     textAlign: "center",
+  },
+  manualInputCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    marginTop: 16,
+    width: "100%",
+  },
+  manualRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
 });
