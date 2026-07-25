@@ -116,7 +116,7 @@ export default function PaywallScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: "transparent" }]}>
       <RevenueCatUI.Paywall 
         onPurchaseCompleted={handlePurchaseCompleted}
         onRestoreCompleted={handleRestoreCompleted}

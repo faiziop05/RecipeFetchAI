@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 export interface Ingredient {
   name: string;
@@ -38,7 +38,7 @@ const initialState: RecipeState = {
 };
 
 export const recipeSlice = createSlice({
-  name: 'recipe',
+  name: "recipe",
   initialState,
   reducers: {
     setActiveRecipe: (state, action: PayloadAction<RecipePayload>) => {

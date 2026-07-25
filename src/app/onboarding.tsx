@@ -9,7 +9,6 @@ import {
   ScrollView,
   NativeSyntheticEvent,
   NativeScrollEvent,
-  ActivityIndicator,
 } from "react-native";
 import {
   SafeAreaView,
@@ -18,11 +17,13 @@ import {
 import { useSelector, useDispatch } from "react-redux";
 import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { safeSetItem } from "@/services/storage";
 import { RootState } from "@/store";
-import { ThemeColors } from "@/theme/colors";
+import { ThemeColors, ThemeGradients } from "@/theme/colors";
 import { completeOnboarding } from "@/store/onboardingSlice";
+import { OnboardingStep } from "@/components/OnboardingStep";
 
 const { width } = Dimensions.get("window");
 
@@ -35,22 +36,20 @@ interface Slide {
 const slides: Slide[] = [
   {
     label: "01 / 03",
-    title: "Scan any recipe,\ninstantly.",
-    body: "Photograph a cookbook page or paste a link. The AI pulls out every ingredient, step, and nutrition value. No typing required.",
+    title: "Turn videos into real recipes.",
+    body: "Paste a TikTok or YouTube link, and we will extract the exact ingredients and steps for you.",
   },
   {
     label: "02 / 03",
-    title: "Tweak it exactly\nhow you want.",
-    body: "Make it healthier, tastier, or edit ingredients and steps by hand. Recalculate calories with one tap when you're done.",
+    title: "Cook with what you have.",
+    body: "Tell us what is in your kitchen, and we will suggest meals you can make right now.",
   },
   {
     label: "03 / 03",
-    title: "Everything in\none private vault.",
-    body: "Every recipe you scan or create is saved to your account. Pin your favourites and cook from anywhere.",
+    title: "Your weekly food hub.",
+    body: "Plan your week, save your favorite meals, and create your own recipes all in one place.",
   },
 ];
-
-const ILLUSTRATION_SIZE = width * 0.65;
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -58,13 +57,12 @@ export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const mode = useSelector((state: RootState) => state.theme.mode);
   const colors = ThemeColors[mode];
-  const isDark = mode === "dark";
 
   const [activeStep, setActiveStep] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const progressAnim = useRef(new Animated.Value(1 / slides.length)).current;
 
-  // New micro-animations
+  // micro-animations
   const floatAnim = useRef(new Animated.Value(0)).current;
   const scanAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -137,6 +135,8 @@ export default function OnboardingScreen() {
     outputRange: ["0%", "100%"],
   });
 
+
+
   const renderOnboardingArt = (slideIndex: number) => {
     const floatY = floatAnim.interpolate({
       inputRange: [0, 1],
@@ -178,13 +178,14 @@ export default function OnboardingScreen() {
               style={[
                 premiumStyles.premiumCard,
                 {
-                  backgroundColor: colors.surface,
+                  backgroundColor: mode === 'dark' ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.8)",
                   borderColor: colors.border,
                   transform: [{ translateY: floatY }],
+                  overflow: 'hidden',
                 },
               ]}
             >
-              <Ionicons name="document-text" size={64} color={colors.primaryAccent} />
+              <Ionicons name="link" size={64} color={colors.textPrimary} />
               <View style={[premiumStyles.skeletonLine, { backgroundColor: colors.border, width: 80, marginTop: 16 }]} />
               <View style={[premiumStyles.skeletonLine, { backgroundColor: colors.border, width: 60 }]} />
             </Animated.View>
@@ -195,7 +196,7 @@ export default function OnboardingScreen() {
                 premiumStyles.scannerGlass,
                 {
                   borderColor: colors.primaryAccent,
-                  backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
+                  backgroundColor: "rgba(45, 212, 191, 0.1)",
                   transform: [{ translateY: scanY }],
                 },
               ]}
@@ -212,7 +213,7 @@ export default function OnboardingScreen() {
               style={[
                 premiumStyles.glow,
                 {
-                  backgroundColor: colors.primaryAccent,
+                  backgroundColor: colors.successGreen,
                   transform: [{ scale: pulseScale }],
                   opacity: pulseOpacity,
                 },
@@ -224,7 +225,7 @@ export default function OnboardingScreen() {
               style={[
                 premiumStyles.stackCardBack,
                 {
-                  backgroundColor: colors.background,
+                  backgroundColor: colors.surface,
                   borderColor: colors.border,
                   opacity: 0.5,
                 },
@@ -236,13 +237,13 @@ export default function OnboardingScreen() {
               style={[
                 premiumStyles.stackCardMiddle,
                 {
-                  backgroundColor: colors.background,
+                  backgroundColor: colors.surface,
                   borderColor: colors.border,
                   transform: [{ translateY: Animated.multiply(floatY as any, 0.5) }, { rotate: "5deg" }, { translateX: 10 }],
                 },
               ]}
             >
-              <Ionicons name="options-outline" size={40} color={colors.textSecondary} style={{ opacity: 0.5 }} />
+              <Ionicons name="nutrition-outline" size={40} color={colors.textSecondary} style={{ opacity: 0.5 }} />
             </Animated.View>
 
             {/* Front Card */}
@@ -250,10 +251,11 @@ export default function OnboardingScreen() {
               style={[
                 premiumStyles.premiumCard,
                 {
-                  backgroundColor: colors.surface,
+                  backgroundColor: mode === 'dark' ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.8)",
                   borderColor: colors.border,
                   padding: 24,
                   transform: [{ translateY: floatY }],
+                  overflow: 'hidden',
                 },
               ]}
             >
@@ -268,11 +270,11 @@ export default function OnboardingScreen() {
               </View>
 
               <View style={[premiumStyles.flexRow, { marginTop: 24 }]}>
-                <View style={[premiumStyles.pill, { backgroundColor: colors.primaryAccent }]}>
-                  <Text style={[premiumStyles.pillText, { color: colors.background }]}>Keto</Text>
+                <View style={[premiumStyles.pill, { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1 }]}>
+                  <Text style={[premiumStyles.pillText, { color: colors.textPrimary }]}>Chicken</Text>
                 </View>
                 <View style={[premiumStyles.pill, { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1 }]}>
-                  <Text style={[premiumStyles.pillText, { color: colors.textPrimary }]}>Vegan</Text>
+                  <Text style={[premiumStyles.pillText, { color: colors.textPrimary }]}>Rice</Text>
                 </View>
               </View>
             </Animated.View>
@@ -314,14 +316,14 @@ export default function OnboardingScreen() {
                   },
                 ]}
               >
-                <Ionicons name="shield-checkmark" size={54} color={colors.primaryAccent} />
+                <Ionicons name="calendar-outline" size={54} color={colors.primaryAccent} />
               </Animated.View>
             </View>
 
             <Animated.View
               style={[
                 premiumStyles.floatingElement,
-                { backgroundColor: colors.surface, borderColor: colors.border, top: 10, right: 30, transform: [{ translateY: floatY }] },
+                { borderColor: colors.border, top: 10, right: 30, transform: [{ translateY: floatY }], overflow: 'hidden' },
               ]}
             >
                <Ionicons name="bookmark" size={20} color={colors.textSecondary} />
@@ -330,10 +332,10 @@ export default function OnboardingScreen() {
             <Animated.View
               style={[
                 premiumStyles.floatingElement,
-                { backgroundColor: colors.surface, borderColor: colors.border, bottom: 20, left: 20, transform: [{ translateY: Animated.multiply(floatY as any, -1) }] },
+                { borderColor: colors.border, bottom: 20, left: 20, transform: [{ translateY: Animated.multiply(floatY as any, -1) }], overflow: 'hidden' },
               ]}
             >
-               <Ionicons name="heart" size={20} color={colors.primaryAccent} />
+               <Ionicons name="heart" size={20} color={colors.successGreen} />
             </Animated.View>
           </View>
         )}
@@ -342,12 +344,12 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={["top", "bottom"]}>
+    <SafeAreaView style={[styles.root, { backgroundColor: "transparent" }]} edges={["top", "bottom"]}>
       {/* ── TOP NAV ─────────────────────────────────────── */}
       <View style={styles.nav}>
         <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
           <Animated.View
-            style={[styles.progressFill, { width: progressWidth, backgroundColor: colors.primaryAccent }]}
+            style={[styles.progressFill, { width: progressWidth, backgroundColor: colors.textPrimary }]}
           />
         </View>
 
@@ -374,19 +376,12 @@ export default function OnboardingScreen() {
         decelerationRate="fast"
       >
         {slides.map((slide, index) => (
-          <View key={index} style={styles.page}>
-            <View style={styles.illustrationArea}>
-              {renderOnboardingArt(index)}
-            </View>
-
-            <View style={styles.content}>
-              <View style={[styles.labelPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text style={[styles.labelText, { color: colors.primaryAccent }]}>{slide.label}</Text>
-              </View>
-              <Text style={[styles.title, { color: colors.textPrimary }]}>{slide.title}</Text>
-              <Text style={[styles.body, { color: colors.textSecondary }]}>{slide.body}</Text>
-            </View>
-          </View>
+          <OnboardingStep
+            key={index}
+            slide={slide}
+            artElement={renderOnboardingArt(index)}
+            colors={colors}
+          />
         ))}
       </ScrollView>
 
@@ -405,7 +400,7 @@ export default function OnboardingScreen() {
                 style={[
                   styles.dot,
                   {
-                    backgroundColor: i === activeStep ? colors.primaryAccent : colors.border,
+                    backgroundColor: i === activeStep ? colors.textPrimary : colors.border,
                     width: i === activeStep ? 32 : 8,
                     opacity: i === activeStep ? 1 : 0.2,
                   },
@@ -418,12 +413,18 @@ export default function OnboardingScreen() {
         <TouchableOpacity
           onPress={handleNext}
           activeOpacity={0.9}
-          style={[styles.nextBtn, { backgroundColor: colors.primaryAccent }]}
         >
-          <Text style={[styles.nextBtnLabel, { color: colors.background }]}>
-            {activeStep === slides.length - 1 ? "Get Started" : "Continue"}
-          </Text>
-          <Ionicons name="arrow-forward" size={16} color={colors.background} />
+          <LinearGradient
+            colors={ThemeGradients.primary}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.nextBtn}
+          >
+            <Text style={[styles.nextBtnLabel, { color: '#FFFFFF' }]}>
+              {activeStep === slides.length - 1 ? "Get Started" : "Next"}
+            </Text>
+            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -451,11 +452,7 @@ const premiumStyles = StyleSheet.create({
     padding: 20,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
+    // Remove shadow for frosted glass, relies on BlurView
   },
   skeletonLine: {
     height: 6,
@@ -547,11 +544,6 @@ const premiumStyles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
   },
   vaultInnerRing: {
     width: 120,
@@ -570,21 +562,13 @@ const premiumStyles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 6,
   },
 });
 
 const styles = StyleSheet.create({
-  // Base Monochrome Foundation
   root: {
     flex: 1,
   },
-
-  // Navigation Progress Track
   nav: {
     flexDirection: "row",
     alignItems: "center",
@@ -610,58 +594,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
   },
-
-  // Scroller Layout
   pager: {
     flex: 1,
   },
-  page: {
-    width,
-    flex: 1,
-  },
-
-  // Studio-Level Illustration Canvas Layouts
-  illustrationArea: {
-    flex: 1.2,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  // Typography Content Area
-  content: {
-    paddingHorizontal: 32,
-    paddingBottom: 24,
-    gap: 16,
-  },
-  labelPill: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 4,
-  },
-  labelText: {
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1,
-    textTransform: "uppercase",
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: "900",
-    letterSpacing: -1,
-    lineHeight: 42,
-  },
-  body: {
-    fontSize: 17,
-    lineHeight: 24,
-    fontWeight: "500",
-    maxWidth: 340,
-    opacity: 0.9,
-  },
-
-  // Action Footer Elements
   footer: {
     paddingHorizontal: 32,
     paddingTop: 16,
@@ -683,6 +618,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    width: '100%',
   },
   nextBtnLabel: {
     fontSize: 18,

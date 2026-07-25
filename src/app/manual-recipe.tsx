@@ -25,6 +25,9 @@ import { db } from '@/services/firebase';
 import { extractRecipe } from '@/services/gemini';
 import { setActiveRecipe } from '@/store/recipeSlice';
 import { incrementFreeScan, checkMonthRollover } from '@/store/subscriptionSlice';
+import { ManualIngredientForm } from '@/components/ManualIngredientForm';
+import { ManualInstructionForm } from '@/components/ManualInstructionForm';
+import { ManualInputField } from '@/components/ManualInputField';
 
 export default function ManualRecipeScreen() {
   const router = useRouter();
@@ -51,7 +54,6 @@ export default function ManualRecipeScreen() {
   // UI Processing State
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState('');
-  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // Custom Alert state config
   const [alertConfig, setAlertConfig] = useState<{
@@ -195,7 +197,7 @@ export default function ManualRecipeScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: "transparent" }]} edges={['top']}>
       {/* Premium Top Navigation Bar */}
       <View style={[styles.headerBar, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -210,7 +212,7 @@ export default function ManualRecipeScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          style={[styles.scroll, { backgroundColor: colors.background }]}
+          style={[styles.scroll, { backgroundColor: "transparent" }]}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -226,84 +228,44 @@ export default function ManualRecipeScreen() {
           {/* Form Fields */}
           <View style={styles.form}>
             {/* Title */}
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Recipe Title *</Text>
-            <TextInput
-              style={[
-                styles.textInput,
-                { 
-                  backgroundColor: colors.surface,
-                  borderColor: focusedField === 'title' ? colors.primaryAccent : colors.border,
-                  color: colors.textPrimary 
-                }
-              ]}
+            <ManualInputField
+              label="Recipe Title *"
+              colors={colors}
               placeholder="e.g. Grandma's Famous Lasagna"
-              placeholderTextColor={colors.textSecondary}
               value={title}
               onChangeText={setTitle}
-              onFocus={() => setFocusedField('title')}
-              onBlur={() => setFocusedField(null)}
             />
 
             {/* Description */}
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Description / Notes</Text>
-            <TextInput
-              style={[
-                styles.textInput,
-                styles.textArea,
-                { 
-                  backgroundColor: colors.surface,
-                  borderColor: focusedField === 'desc' ? colors.primaryAccent : colors.border,
-                  color: colors.textPrimary 
-                }
-              ]}
+            <ManualInputField
+              label="Description / Notes"
+              colors={colors}
+              style={styles.textArea}
               placeholder="A short note about the recipe..."
-              placeholderTextColor={colors.textSecondary}
               value={description}
               onChangeText={setDescription}
               multiline
               numberOfLines={3}
-              onFocus={() => setFocusedField('desc')}
-              onBlur={() => setFocusedField(null)}
             />
 
             {/* Row: Prep & Cook Time */}
             <View style={styles.row}>
               <View style={styles.flexItem}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>Prep Time</Text>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    { 
-                      backgroundColor: colors.surface,
-                      borderColor: focusedField === 'prep' ? colors.primaryAccent : colors.border,
-                      color: colors.textPrimary 
-                    }
-                  ]}
+                <ManualInputField
+                  label="Prep Time"
+                  colors={colors}
                   placeholder="e.g. 15 mins"
-                  placeholderTextColor={colors.textSecondary}
                   value={prepTime}
                   onChangeText={setPrepTime}
-                  onFocus={() => setFocusedField('prep')}
-                  onBlur={() => setFocusedField(null)}
                 />
               </View>
               <View style={styles.flexItem}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>Cook Time</Text>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    { 
-                      backgroundColor: colors.surface,
-                      borderColor: focusedField === 'cook' ? colors.primaryAccent : colors.border,
-                      color: colors.textPrimary 
-                    }
-                  ]}
+                <ManualInputField
+                  label="Cook Time"
+                  colors={colors}
                   placeholder="e.g. 45 mins"
-                  placeholderTextColor={colors.textSecondary}
                   value={cookTime}
                   onChangeText={setCookTime}
-                  onFocus={() => setFocusedField('cook')}
-                  onBlur={() => setFocusedField(null)}
                 />
               </View>
             </View>
@@ -311,87 +273,37 @@ export default function ManualRecipeScreen() {
             {/* Row: Servings & Category */}
             <View style={styles.row}>
               <View style={styles.flexItem}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>Servings</Text>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    { 
-                      backgroundColor: colors.surface,
-                      borderColor: focusedField === 'servings' ? colors.primaryAccent : colors.border,
-                      color: colors.textPrimary 
-                    }
-                  ]}
+                <ManualInputField
+                  label="Servings"
+                  colors={colors}
                   placeholder="e.g. 4 servings"
-                  placeholderTextColor={colors.textSecondary}
                   value={servings}
                   onChangeText={setServings}
-                  onFocus={() => setFocusedField('servings')}
-                  onBlur={() => setFocusedField(null)}
                 />
               </View>
               <View style={styles.flexItem}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>Category</Text>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    { 
-                      backgroundColor: colors.surface,
-                      borderColor: focusedField === 'category' ? colors.primaryAccent : colors.border,
-                      color: colors.textPrimary 
-                    }
-                  ]}
+                <ManualInputField
+                  label="Category"
+                  colors={colors}
                   placeholder="e.g. Dinner, Italian"
-                  placeholderTextColor={colors.textSecondary}
                   value={category}
                   onChangeText={setCategory}
-                  onFocus={() => setFocusedField('category')}
-                  onBlur={() => setFocusedField(null)}
                 />
               </View>
             </View>
 
             {/* Ingredients multiline */}
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Raw Ingredients List *</Text>
-            <TextInput
-              style={[
-                styles.textInput,
-                styles.ingredientsArea,
-                { 
-                  backgroundColor: colors.surface,
-                  borderColor: focusedField === 'ingredients' ? colors.primaryAccent : colors.border,
-                  color: colors.textPrimary 
-                }
-              ]}
-              placeholder={"Enter ingredients (any format):\ne.g.\n- 2 cups white flour\n- 3 large eggs\n- a pinch of salt\n- 1/2 stick unsalted butter"}
-              placeholderTextColor={colors.textSecondary}
+            <ManualIngredientForm
               value={ingredients}
               onChangeText={setIngredients}
-              multiline
-              textAlignVertical="top"
-              onFocus={() => setFocusedField('ingredients')}
-              onBlur={() => setFocusedField(null)}
+              colors={colors}
             />
 
             {/* Instructions multiline */}
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Raw Cooking Steps *</Text>
-            <TextInput
-              style={[
-                styles.textInput,
-                styles.instructionsArea,
-                { 
-                  backgroundColor: colors.surface,
-                  borderColor: focusedField === 'instructions' ? colors.primaryAccent : colors.border,
-                  color: colors.textPrimary 
-                }
-              ]}
-              placeholder={"Enter cooking steps (any format):\ne.g.\n1. Mix flour and salt in a bowl.\n2. Beat the eggs and whisk them in.\n3. Bake in a preheated oven at 350F for 30 minutes."}
-              placeholderTextColor={colors.textSecondary}
+            <ManualInstructionForm
               value={instructions}
               onChangeText={setInstructions}
-              multiline
-              textAlignVertical="top"
-              onFocus={() => setFocusedField('instructions')}
-              onBlur={() => setFocusedField(null)}
+              colors={colors}
             />
 
             {/* AI Action Submit Button */}
@@ -407,7 +319,7 @@ export default function ManualRecipeScreen() {
       {/* Loading Modal Overlay */}
       {loading && (
         <View style={styles.overlayBackground}>
-          <View style={[styles.overlayContent, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.overlayContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <ActivityIndicator size="large" color={colors.primaryAccent} />
             <Text style={[styles.overlayTitle, { color: colors.textPrimary }]}>Culinary Genius at Work</Text>
             <Text style={[styles.overlayStep, { color: colors.textSecondary }]}>{loadingStep}</Text>
@@ -496,20 +408,6 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     textAlignVertical: 'top',
   },
-  ingredientsArea: {
-    height: 160,
-    paddingTop: 12,
-    paddingBottom: 12,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  instructionsArea: {
-    height: 220,
-    paddingTop: 12,
-    paddingBottom: 12,
-    fontSize: 14,
-    lineHeight: 20,
-  },
   row: {
     flexDirection: 'row',
     gap: 16,
@@ -536,14 +434,9 @@ const styles = StyleSheet.create({
   overlayContent: {
     padding: 24,
     borderRadius: 16,
-    borderWidth: 1,
+    borderWidth: 0.5,
     alignItems: 'center',
     width: '75%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5,
   },
   overlayTitle: {
     fontSize: 18,

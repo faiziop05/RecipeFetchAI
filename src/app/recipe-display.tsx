@@ -29,6 +29,14 @@ import { setActiveRecipe, Ingredient } from "@/store/recipeSlice";
 import { db } from "@/services/firebase";
 import { CustomAlert } from "@/components/CustomAlert";
 
+import { RecipeHeader } from "@/components/RecipeHeader";
+import { RecipeHeroCard } from "@/components/RecipeHeroCard";
+import { RecipeMetrics } from "@/components/RecipeMetrics";
+import { IngredientList } from "@/components/IngredientList";
+import { InstructionList } from "@/components/InstructionList";
+import { CookModeModal } from "@/components/CookModeModal";
+import { EditRecipeModal } from "@/components/EditRecipeModal";
+
 // Map recipe title keywords to fun emojis
 function getRecipeEmoji(title: string): string {
   const t = title.toLowerCase();
@@ -154,6 +162,7 @@ export default function RecipeDisplayScreen() {
   const [mutationStep, setMutationStep] = useState("");
   const [isEditPromptVisible, setIsEditPromptVisible] = useState(false);
   const [customEditInstructions, setCustomEditInstructions] = useState("");
+  const [isCookModeVisible, setIsCookModeVisible] = useState(false);
 
   if (!activeRecipe) {
     return (
@@ -174,45 +183,7 @@ export default function RecipeDisplayScreen() {
     );
   }
 
-  // Manual Edit Handlers
-  const handleAddIngredientRow = () => {
-    setEditedIngredients((prev) => [
-      ...prev,
-      { name: "", amount: "", description: "" },
-    ]);
-  };
 
-  const handleRemoveIngredientRow = (index: number) => {
-    setEditedIngredients((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
-  const handleIngredientFieldChange = (
-    index: number,
-    field: keyof Ingredient,
-    value: string,
-  ) => {
-    setEditedIngredients((prev) => {
-      const next = [...prev];
-      next[index] = { ...next[index], [field]: value };
-      return next;
-    });
-  };
-
-  const handleAddInstructionRow = () => {
-    setEditedInstructions((prev) => [...prev, ""]);
-  };
-
-  const handleRemoveInstructionRow = (index: number) => {
-    setEditedInstructions((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
-  const handleInstructionFieldChange = (index: number, value: string) => {
-    setEditedInstructions((prev) => {
-      const next = [...prev];
-      next[index] = value;
-      return next;
-    });
-  };
 
   const handleSaveManualRecipe = async () => {
     const cleanIngredients = editedIngredients.filter(
@@ -500,55 +471,18 @@ export default function RecipeDisplayScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[styles.container, { backgroundColor: "transparent" }]}
       edges={["top"]}
     >
       {/* Sticky Top Header Bar */}
-      <View
-        style={[
-          styles.headerBar,
-          {
-            borderBottomColor: colors.border,
-            backgroundColor: colors.background,
-          },
-        ]}
-      >
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backBtn}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={20}
-            color={colors.primaryAccent}
-          />
-          <Text style={[styles.backText, { color: colors.textPrimary }]}>
-            Back
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={[styles.headerTitle, { color: colors.textSecondary }]}>
-          RECIPE WORKSPACE
-        </Text>
-
-        <TouchableOpacity
-          onPress={handleToggleBookmark}
-          disabled={isSaveLoading}
-          style={styles.bookmarkBtn}
-          activeOpacity={0.7}
-        >
-          {isSaveLoading ? (
-            <ActivityIndicator size="small" color={colors.primaryAccent} />
-          ) : (
-            <Ionicons
-              name={activeRecipe.isPinned ? "bookmark" : "bookmark-outline"}
-              size={22}
-              color={colors.primaryAccent}
-            />
-          )}
-        </TouchableOpacity>
-      </View>
+      <RecipeHeader
+        onBack={() => router.back()}
+        onToggleBookmark={handleToggleBookmark}
+        isPinned={!!activeRecipe.isPinned}
+        isSaveLoading={isSaveLoading}
+        colors={colors}
+        mode={mode}
+      />
 
       <ScrollView
         contentContainerStyle={[
@@ -556,211 +490,20 @@ export default function RecipeDisplayScreen() {
           { paddingBottom: 90 + insets.bottom },
         ]}
       >
-        {/* Hero Top Card */}
-        <View
-          style={[
-            styles.heroCard,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          {/* Emoji Badge */}
-          <View
-            style={[
-              styles.emojiContainer,
-              {
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-              },
-            ]}
-          >
-            <Text style={styles.heroEmoji}>
-              {getRecipeEmoji(activeRecipe.title)}
-            </Text>
-          </View>
+        <RecipeHeroCard
+          title={activeRecipe.title}
+          colors={colors}
+          mode={mode}
+        />
 
-          {/* Recipe Title & Badge Row */}
-          <View style={styles.heroTitleArea}>
-            <View
-              style={[
-                styles.recipeBadge,
-                { backgroundColor: colors.primaryAccent },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.recipeBadgeText,
-                  { color: mode === "light" ? "#FFFFFF" : "#000000" },
-                ]}
-              >
-                ✨ AI Scanned
-              </Text>
-            </View>
-            <Text style={[styles.recipeTitle, { color: colors.textPrimary }]}>
-              {activeRecipe.title}
-            </Text>
-          </View>
-
-          {/* Quick Metrics Columns */}
-          <View style={styles.metricsContainer}>
-            {/* Row 1: Core Info (Prep Time & Calories) */}
-            <View style={styles.metricsRow}>
-              <View
-                style={[
-                  styles.coreMetricPill,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="time-outline"
-                  size={16}
-                  color={colors.primaryAccent}
-                  style={{ marginRight: 8 }}
-                />
-                <View style={styles.coreMetricTextContainer}>
-                  <Text
-                    style={[
-                      styles.coreMetricValue,
-                      { color: colors.textPrimary },
-                    ]}
-                  >
-                    {activeRecipe.prepTime}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.coreMetricLabel,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    Prep Time
-                  </Text>
-                </View>
-              </View>
-
-              <View
-                style={[
-                  styles.coreMetricPill,
-                  styles.highlightedPill,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.primaryAccent,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="flame"
-                  size={16}
-                  color={colors.primaryAccent}
-                  style={{ marginRight: 8 }}
-                />
-                <View style={styles.coreMetricTextContainer}>
-                  <Text
-                    style={[
-                      styles.coreMetricValue,
-                      { color: colors.textPrimary },
-                    ]}
-                  >
-                    {activeRecipe.calories}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.coreMetricLabel,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    Calories
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Row 2: Macros (Protein, Carbs, Fats) */}
-            <View style={styles.metricsRow}>
-              <View
-                style={[
-                  styles.macroMetricPill,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="barbell-outline"
-                  size={14}
-                  color={colors.textSecondary}
-                  style={{ marginBottom: 4 }}
-                />
-                <Text
-                  style={[styles.macroValue, { color: colors.textPrimary }]}
-                >
-                  {activeRecipe.totalProtein || "—"}
-                </Text>
-                <Text
-                  style={[styles.macroLabel, { color: colors.textSecondary }]}
-                >
-                  Protein
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.macroMetricPill,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="nutrition-outline"
-                  size={14}
-                  color={colors.textSecondary}
-                  style={{ marginBottom: 4 }}
-                />
-                <Text
-                  style={[styles.macroValue, { color: colors.textPrimary }]}
-                >
-                  {activeRecipe.totalCarbs || "—"}
-                </Text>
-                <Text
-                  style={[styles.macroLabel, { color: colors.textSecondary }]}
-                >
-                  Carbs
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.macroMetricPill,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="water-outline"
-                  size={14}
-                  color={colors.textSecondary}
-                  style={{ marginBottom: 4 }}
-                />
-                <Text
-                  style={[styles.macroValue, { color: colors.textPrimary }]}
-                >
-                  {activeRecipe.totalFats}
-                </Text>
-                <Text
-                  style={[styles.macroLabel, { color: colors.textSecondary }]}
-                >
-                  Fats
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
+        <RecipeMetrics
+          prepTime={activeRecipe.prepTime}
+          calories={activeRecipe.calories}
+          totalProtein={activeRecipe.totalProtein}
+          totalCarbs={activeRecipe.totalCarbs}
+          totalFats={activeRecipe.totalFats}
+          colors={colors}
+        />
 
         {activeRecipe.isManuallyEdited && (
           <View
@@ -825,220 +568,22 @@ export default function RecipeDisplayScreen() {
         )}
 
         {/* Interactive Ingredients Checklist */}
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleRow}>
-            <Ionicons
-              name="list-outline"
-              size={18}
-              color={colors.textSecondary}
-            />
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-              Ingredients
-            </Text>
-            <View
-              style={[
-                styles.sectionHintBadge,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Ionicons
-                name="information-circle-outline"
-                size={11}
-                color={colors.textSecondary}
-              />
-              <Text
-                style={[
-                  styles.sectionHintText,
-                  { color: colors.textSecondary },
-                ]}
-              >
-                tap name for nutrition
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {activeRecipe.ingredients.map((item, index) => {
-          const isChecked = checkedIngredients[item.name] || false;
-          return (
-            <View
-              key={index}
-              style={[
-                styles.ingredientRow,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                isChecked && { opacity: 0.45 },
-              ]}
-            >
-              <TouchableOpacity
-                onPress={() => toggleIngredientCheck(item.name)}
-                style={styles.checkboxContainer}
-              >
-                <Ionicons
-                  name={isChecked ? "checkmark-circle" : "ellipse-outline"}
-                  size={22}
-                  color={
-                    isChecked ? colors.primaryAccent : colors.textSecondary
-                  }
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => handleOpenIngredientDeepDive(item)}
-                style={styles.ingredientTextContainer}
-                activeOpacity={0.7}
-              >
-                <View style={styles.ingredientNameRow}>
-                  <Text
-                    style={[
-                      styles.ingredientName,
-                      { color: colors.textPrimary },
-                      isChecked && styles.strikethrough,
-                    ]}
-                  >
-                    {item.name}
-                  </Text>
-                  {/* Visible affordance: small info icon shows it's tappable for nutrition */}
-                  <Ionicons
-                    name="chevron-forward"
-                    size={12}
-                    color={colors.primaryAccent}
-                    style={{ marginLeft: 4, marginTop: 2 }}
-                  />
-                </View>
-                <Text
-                  style={[
-                    styles.ingredientAmount,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {item.amount}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          );
-        })}
+        <IngredientList
+          ingredients={activeRecipe.ingredients}
+          checkedIngredients={checkedIngredients}
+          onToggleCheck={toggleIngredientCheck}
+          onOpenDeepDive={handleOpenIngredientDeepDive}
+          colors={colors}
+        />
 
         {/* Numbered Cooking Instructions Timeline */}
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleRow}>
-            <Ionicons
-              name="restaurant-outline"
-              size={18}
-              color={colors.textSecondary}
-            />
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-              Instructions
-            </Text>
-          </View>
-        </View>
-
-        {activeRecipe.instructions.map((step, index) => {
-          const isLastStep = index === activeRecipe.instructions.length - 1;
-
-          // Highlight ingredient names that appear in this step
-          const highlightedSegments = (() => {
-            // Build a list of {text, isIngredient, isChecked} segments
-            const allIngredients = activeRecipe.ingredients.map((i) => i.name);
-            let remaining = step;
-            const segments: Array<{
-              text: string;
-              isIngredient: boolean;
-              isChecked: boolean;
-            }> = [];
-            while (remaining.length > 0) {
-              let earliestIdx = -1;
-              let earliestName = "";
-              for (const name of allIngredients) {
-                const idx = remaining.toLowerCase().indexOf(name.toLowerCase());
-                if (idx !== -1 && (earliestIdx === -1 || idx < earliestIdx)) {
-                  earliestIdx = idx;
-                  earliestName = name;
-                }
-              }
-              if (earliestIdx === -1) {
-                segments.push({
-                  text: remaining,
-                  isIngredient: false,
-                  isChecked: false,
-                });
-                break;
-              }
-              if (earliestIdx > 0) {
-                segments.push({
-                  text: remaining.slice(0, earliestIdx),
-                  isIngredient: false,
-                  isChecked: false,
-                });
-              }
-              const checked = checkedIngredients[earliestName] || false;
-              segments.push({
-                text: remaining.slice(
-                  earliestIdx,
-                  earliestIdx + earliestName.length,
-                ),
-                isIngredient: true,
-                isChecked: checked,
-              });
-              remaining = remaining.slice(earliestIdx + earliestName.length);
-            }
-            return segments;
-          })();
-
-          return (
-            <View key={index} style={styles.instructionStepContainer}>
-              {/* Timeline Connector Line */}
-              {!isLastStep && (
-                <View
-                  style={[
-                    styles.timelineLine,
-                    { backgroundColor: colors.border },
-                  ]}
-                />
-              )}
-
-              <View
-                style={[
-                  styles.stepNumberBadge,
-                  { backgroundColor: colors.primaryAccent },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.stepNumberText,
-                    { color: mode === "light" ? "#FFFFFF" : "#000000" },
-                  ]}
-                >
-                  {index + 1}
-                </Text>
-              </View>
-              <View style={styles.stepContentContainer}>
-                <Text
-                  style={[
-                    styles.instructionStepText,
-                    { color: colors.textPrimary },
-                  ]}
-                >
-                  {highlightedSegments.map((seg, si) =>
-                    seg.isIngredient ? (
-                      <Text
-                        key={si}
-                        style={[
-                          styles.instructionIngredientHighlight,
-                          { color: colors.primaryAccent },
-                          seg.isChecked && styles.strikethrough,
-                        ]}
-                      >
-                        {seg.text}
-                      </Text>
-                    ) : (
-                      <Text key={si}>{seg.text}</Text>
-                    ),
-                  )}
-                </Text>
-              </View>
-            </View>
-          );
-        })}
+        <InstructionList
+          instructions={activeRecipe.instructions}
+          ingredients={activeRecipe.ingredients}
+          checkedIngredients={checkedIngredients}
+          colors={colors}
+          mode={mode}
+        />
       </ScrollView>
 
       {/* Sticky Bottom Actions Toolbar */}
@@ -1129,6 +674,31 @@ export default function RecipeDisplayScreen() {
           style={[styles.toolbarDivider, { backgroundColor: colors.border }]}
         />
 
+        {/* Cook Mode action */}
+        <TouchableOpacity
+          style={[
+            styles.toolbarBtnIcon,
+            {
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.border,
+            },
+          ]}
+          onPress={() => setIsCookModeVisible(true)}
+          activeOpacity={0.85}
+        >
+          <Ionicons
+            name="restaurant-outline"
+            size={18}
+            color={colors.primaryAccent}
+          />
+          <Text
+            style={[styles.toolbarBtnIconText, { color: colors.primaryAccent }]}
+          >
+            Cook
+          </Text>
+        </TouchableOpacity>
+
         {/* Secondary action — compact icon button */}
         <TouchableOpacity
           style={[
@@ -1141,10 +711,10 @@ export default function RecipeDisplayScreen() {
           ]}
           onPress={() => {
             setEditedIngredients(
-              JSON.parse(JSON.stringify(activeRecipe.ingredients)),
+              JSON.parse(JSON.stringify(activeRecipe.ingredients || []))
             );
             setEditedInstructions(
-              JSON.parse(JSON.stringify(activeRecipe.instructions)),
+              JSON.parse(JSON.stringify(activeRecipe.instructions || []))
             );
             setIsEditPromptVisible(true);
           }}
@@ -1167,7 +737,7 @@ export default function RecipeDisplayScreen() {
       <Modal visible={isModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View
-            style={[styles.modalContent, { backgroundColor: colors.surface }]}
+            style={[styles.modalContent, { backgroundColor: colors.background, height: "85%", paddingBottom: 40 }]}
           >
             {/* Header */}
             <View
@@ -1260,7 +830,7 @@ export default function RecipeDisplayScreen() {
                         { color: colors.textPrimary },
                       ]}
                     >
-                      {selectedIngredient.nutrition?.calories || "N/A"}
+                      {selectedIngredient.nutrition?.calories || (selectedIngredient as any).calories || "N/A"}
                     </Text>
                   </View>
                   <View style={styles.nutritionRow}>
@@ -1278,7 +848,7 @@ export default function RecipeDisplayScreen() {
                         { color: colors.textPrimary },
                       ]}
                     >
-                      {selectedIngredient.nutrition?.protein || "N/A"}
+                      {selectedIngredient.nutrition?.protein || (selectedIngredient as any).protein || "N/A"}
                     </Text>
                   </View>
                   <View style={styles.nutritionRow}>
@@ -1296,7 +866,7 @@ export default function RecipeDisplayScreen() {
                         { color: colors.textPrimary },
                       ]}
                     >
-                      {selectedIngredient.nutrition?.carbs || "N/A"}
+                      {selectedIngredient.nutrition?.carbs || (selectedIngredient as any).carbs || "N/A"}
                     </Text>
                   </View>
                   <View style={styles.nutritionRow}>
@@ -1314,7 +884,7 @@ export default function RecipeDisplayScreen() {
                         { color: colors.textPrimary },
                       ]}
                     >
-                      {selectedIngredient.nutrition?.fat || "N/A"}
+                      {selectedIngredient.nutrition?.fat || (selectedIngredient as any).fat || (selectedIngredient as any).fats || "N/A"}
                     </Text>
                   </View>
                 </View>
@@ -1349,320 +919,34 @@ export default function RecipeDisplayScreen() {
       </Modal>
 
       {/* Edit Recipe Ingredients & Instructions Manual Modal */}
-      <Modal visible={isEditPromptVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={[
-              styles.modalContent,
-              { backgroundColor: colors.surface, height: "85%" },
-            ]}
-          >
-            {/* Header */}
-            <View
-              style={[styles.modalHeader, { borderBottomColor: colors.border }]}
-            >
-              <View>
-                <Text
-                  style={[
-                    styles.modalHeaderTitle,
-                    { color: colors.textPrimary },
-                  ]}
-                >
-                  Edit Recipe
-                </Text>
-                <Text
-                  style={[
-                    styles.modalSubHeaderTitle,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  Modify ingredients and cooking steps manually
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setIsEditPromptVisible(false)}
-                style={styles.closeModalBtn}
-              >
-                <Ionicons name="close" size={24} color={colors.textPrimary} />
-              </TouchableOpacity>
-            </View>
+      <EditRecipeModal
+        isVisible={isEditPromptVisible}
+        onClose={() => setIsEditPromptVisible(false)}
+        editedIngredients={editedIngredients}
+        editedInstructions={editedInstructions}
+        setEditedIngredients={setEditedIngredients}
+        setEditedInstructions={setEditedInstructions}
+        onSave={handleSaveManualRecipe}
+        isSaveLoading={isSaveLoading}
+        colors={colors}
+        mode={mode}
+      />
 
-            {/* Scrollable Form */}
-            <ScrollView
-              style={styles.editorScrollView}
-              contentContainerStyle={styles.editorScrollContent}
-              keyboardShouldPersistTaps="handled"
-            >
-              {/* Ingredients section title */}
-              <View style={{ marginBottom: 12 }}>
-                <Text
-                  style={[
-                    styles.editorSectionTitle,
-                    { color: colors.textPrimary },
-                  ]}
-                >
-                  Ingredients
-                </Text>
-              </View>
-
-              {editedIngredients.map((item, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.editorRowCard,
-                    {
-                      borderColor: colors.border,
-                      backgroundColor: colors.background,
-                    },
-                  ]}
-                >
-                  {/* Inputs Section */}
-                  <View style={styles.editorInputsContainer}>
-                    {/* Ingredient Name */}
-                    <View style={styles.editorInputGroup}>
-                      <Text
-                        style={[
-                          styles.editorLabel,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        Name
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.editorInput,
-                          {
-                            color: colors.textPrimary,
-                            borderColor: colors.border,
-                            backgroundColor: colors.surface,
-                          },
-                        ]}
-                        placeholder="e.g. Boneless Chicken Breast"
-                        placeholderTextColor={colors.textSecondary}
-                        value={item.name}
-                        onChangeText={(val) =>
-                          handleIngredientFieldChange(index, "name", val)
-                        }
-                      />
-                    </View>
-
-                    {/* Flex Row for Amount & Description */}
-                    <View style={styles.editorFlexRow}>
-                      {/* Amount */}
-                      <View style={[styles.editorInputGroup, { flex: 1 }]}>
-                        <Text
-                          style={[
-                            styles.editorLabel,
-                            { color: colors.textSecondary },
-                          ]}
-                        >
-                          Amount
-                        </Text>
-                        <TextInput
-                          style={[
-                            styles.editorInput,
-                            {
-                              color: colors.textPrimary,
-                              borderColor: colors.border,
-                              backgroundColor: colors.surface,
-                            },
-                          ]}
-                          placeholder="e.g. 500g"
-                          placeholderTextColor={colors.textSecondary}
-                          value={item.amount}
-                          onChangeText={(val) =>
-                            handleIngredientFieldChange(index, "amount", val)
-                          }
-                        />
-                      </View>
-
-                      {/* Notes/Description */}
-                      <View style={[styles.editorInputGroup, { flex: 2 }]}>
-                        <Text
-                          style={[
-                            styles.editorLabel,
-                            { color: colors.textSecondary },
-                          ]}
-                        >
-                          Notes
-                        </Text>
-                        <TextInput
-                          style={[
-                            styles.editorInput,
-                            {
-                              color: colors.textPrimary,
-                              borderColor: colors.border,
-                              backgroundColor: colors.surface,
-                            },
-                          ]}
-                          placeholder="e.g. cubed, skinless"
-                          placeholderTextColor={colors.textSecondary}
-                          value={item.description || ""}
-                          onChangeText={(val) =>
-                            handleIngredientFieldChange(
-                              index,
-                              "description",
-                              val,
-                            )
-                          }
-                        />
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Remove Button */}
-                  <TouchableOpacity
-                    style={[
-                      styles.editorDeleteBtn,
-                      { borderColor: colors.border },
-                    ]}
-                    onPress={() => handleRemoveIngredientRow(index)}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-
-              {/* Add Row Button */}
-              <TouchableOpacity
-                style={[
-                  styles.editorAddBtn,
-                  { borderColor: colors.primaryAccent },
-                ]}
-                onPress={handleAddIngredientRow}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="add" size={20} color={colors.primaryAccent} />
-                <Text
-                  style={[
-                    styles.editorAddBtnText,
-                    { color: colors.primaryAccent },
-                  ]}
-                >
-                  Add Ingredient
-                </Text>
-              </TouchableOpacity>
-
-              {/* Instructions Section Header */}
-              <View
-                style={[
-                  styles.editorSectionHeader,
-                  { borderTopColor: colors.border },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.editorSectionTitle,
-                    { color: colors.textPrimary },
-                  ]}
-                >
-                  Instructions / Steps
-                </Text>
-              </View>
-
-              {/* Instructions List */}
-              {editedInstructions.map((item, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.editorInstructionCard,
-                    {
-                      borderColor: colors.border,
-                      backgroundColor: colors.background,
-                    },
-                  ]}
-                >
-                  <View style={styles.editorInstructionHeader}>
-                    <Text
-                      style={[
-                        styles.editorInstructionNumber,
-                        { color: colors.primaryAccent },
-                      ]}
-                    >
-                      Step {index + 1}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => handleRemoveInstructionRow(index)}
-                      activeOpacity={0.7}
-                      style={styles.editorInstructionDeleteBtn}
-                    >
-                      <Ionicons
-                        name="trash-outline"
-                        size={16}
-                        color="#EF4444"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                  <TextInput
-                    style={[
-                      styles.editorInstructionInput,
-                      {
-                        color: colors.textPrimary,
-                        borderColor: colors.border,
-                        backgroundColor: colors.surface,
-                      },
-                    ]}
-                    placeholder={`e.g. Cook for 5 minutes...`}
-                    placeholderTextColor={colors.textSecondary}
-                    value={item}
-                    onChangeText={(val) =>
-                      handleInstructionFieldChange(index, val)
-                    }
-                    multiline
-                    numberOfLines={3}
-                  />
-                </View>
-              ))}
-
-              {/* Add Instruction Step Row Button */}
-              <TouchableOpacity
-                style={[
-                  styles.editorAddBtn,
-                  { borderColor: colors.primaryAccent },
-                ]}
-                onPress={handleAddInstructionRow}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="add" size={20} color={colors.primaryAccent} />
-                <Text
-                  style={[
-                    styles.editorAddBtnText,
-                    { color: colors.primaryAccent },
-                  ]}
-                >
-                  Add Instruction Step
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
-
-            {/* Footer Buttons */}
-            <View
-              style={[styles.editorFooter, { borderTopColor: colors.border }]}
-            >
-              <ActionButton
-                title="Cancel"
-                variant="outline"
-                onPress={() => setIsEditPromptVisible(false)}
-                style={styles.editorFooterBtn}
-              />
-              <ActionButton
-                title={isSaveLoading ? "Saving..." : "Save Changes"}
-                onPress={handleSaveManualRecipe}
-                style={styles.editorFooterBtn}
-                disabled={isSaveLoading}
-              />
-            </View>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
+      <CookModeModal
+        isVisible={isCookModeVisible}
+        onClose={() => setIsCookModeVisible(false)}
+        recipe={activeRecipe}
+        colors={colors}
+        mode={mode}
+        userId={userId}
+        showAlert={showAlert}
+      />
 
       {/* Background AI Mutating Overlay */}
       <Modal visible={isMutating} transparent>
         <View style={styles.overlayBackground}>
           <View
-            style={[styles.overlayContent, { backgroundColor: colors.surface }]}
+            style={[styles.overlayContent, { backgroundColor: colors.background }]}
           >
             <ActivityIndicator size="large" color={colors.primaryAccent} />
             <Text style={[styles.overlayTitle, { color: colors.textPrimary }]}>

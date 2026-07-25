@@ -1,35 +1,36 @@
-import React, { useEffect, useState } from "react";
-import {
-  StyleSheet,
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  TextInput,
-  ScrollView,
-  Modal,
-} from "react-native";
-import { useSelector, useDispatch } from "react-redux";
-import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useRouter } from "expo-router";
 import {
   collection,
-  doc,
   deleteDoc,
+  doc,
   onSnapshot,
-  query,
   orderBy,
+  query,
 } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useDispatch, useSelector } from "react-redux";
 
-import { RootState } from "@/store";
-import { ThemeColors } from "@/theme/colors";
-import { CardContainer } from "@/components/CardContainer";
 import { ActionButton } from "@/components/ActionButton";
-import { db } from "@/services/firebase";
-import { setActiveRecipe, RecipePayload } from "@/store/recipeSlice";
+import { CardContainer } from "@/components/CardContainer";
 import { CustomAlert } from "@/components/CustomAlert";
+import { TabHeader } from "@/components/TabHeader";
+import { db } from "@/services/firebase";
+import { RootState } from "@/store";
+import { RecipePayload, setActiveRecipe } from "@/store/recipeSlice";
+import { ThemeColors, ThemeGradients } from "@/theme/colors";
 
 const CATEGORY_EMOJIS: Record<string, string> = {
   All: "🍽️",
@@ -49,6 +50,24 @@ const CATEGORIES = [
   "Snacks",
 ];
 
+interface CookedLog {
+  id: string;
+  cookedAt: string;
+  rating: number;
+  notes: string;
+  recipe: {
+    title: string;
+    prepTime: string;
+    calories: string;
+    totalProtein?: string;
+    totalCarbs?: string;
+    totalFats?: string;
+    ingredients: any[];
+    instructions: any[];
+    id?: string;
+  };
+}
+
 export default function VaultScreen() {
   const router = useRouter();
   const dispatch = useDispatch();
@@ -57,9 +76,13 @@ export default function VaultScreen() {
 
   const userId = useSelector((state: RootState) => state.auth.uid);
   const [scannedRecipes, setScannedRecipes] = useState<RecipePayload[]>([]);
+  const [cookedLogs, setCookedLogs] = useState<CookedLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Advanced States
+  // Layout & Navigation States
+  const [activeSubTab, setActiveSubTab] = useState<
+    "scans" | "cooked" | "favorites"
+  >("scans");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [layoutMode, setLayoutMode] = useState<"list" | "grid">("grid");
@@ -71,18 +94,31 @@ export default function VaultScreen() {
     visible: boolean;
     title: string;
     message: string;
-    type?: 'info' | 'success' | 'error' | 'confirm';
-    buttons?: Array<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }>;
-  }>({ visible: false, title: '', message: '' });
+    type?: "info" | "success" | "error" | "confirm";
+    buttons?: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }>;
+  }>({ visible: false, title: "", message: "" });
 
   const showAlert = (
     title: string,
     message: string,
-    type: 'info' | 'success' | 'error' | 'confirm' = 'info',
-    buttons?: Array<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }>
+    type: "info" | "success" | "error" | "confirm" = "info",
+    buttons?: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }>,
   ) => {
     setAlertConfig({ visible: true, title, message, type, buttons });
   };
+
+  // Reset page size whenever active subtab changes
+  useEffect(() => {
+    setVisibleLimit(6);
+  }, [activeSubTab]);
 
   // Real-time listener for user-specific scanned recipes library in Firestore
   useEffect(() => {
@@ -111,6 +147,30 @@ export default function VaultScreen() {
       (error) => {
         console.warn("[Vault] Firestore Snapshot Error:", error);
         setLoading(false);
+      },
+    );
+
+    return unsubscribe;
+  }, [userId]);
+
+  // Real-time listener for user-specific cooked logs library in Firestore
+  useEffect(() => {
+    if (!userId) return;
+
+    const cookedRef = collection(db, `users/${userId}/cooked_memory`);
+    const q = query(cookedRef, orderBy("cookedAt", "desc"));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const parsed: CookedLog[] = [];
+        snapshot.forEach((doc) => {
+          parsed.push({ id: doc.id, ...doc.data() } as CookedLog);
+        });
+        setCookedLogs(parsed);
+      },
+      (error) => {
+        console.warn("[Vault] Cooked logs fetch error:", error);
       },
     );
 
@@ -159,34 +219,41 @@ export default function VaultScreen() {
   };
 
   // Handle hard deleting from Scanned history
-  const handleDeleteScanned = async (id: string, title: string) => {
+  const handleDeleteRecipe = async (id: string, title: string) => {
     if (!userId || !id) return;
 
-    showAlert(
-      "Delete Scan",
-      `Are you sure you want to permanently delete "${title}" from your scanned history? (This will also unpin it if bookmarked)`,
-      "confirm",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const docRef = doc(db, `users/${userId}/scanned_recipes`, id);
-              await deleteDoc(docRef);
-            } catch (err) {
-              console.error("Firestore Delete Scan Error:", err);
-              showAlert(
-                "Error",
-                "Could not delete scanned recipe. Please check your network connection and try again.",
-                "error"
-              );
-            }
-          },
+    const isScanOrFavorite =
+      activeSubTab === "scans" || activeSubTab === "favorites";
+    const deleteCollection = isScanOrFavorite
+      ? "scanned_recipes"
+      : "cooked_memory";
+    const alertTitle = isScanOrFavorite
+      ? "Delete Saved Recipe"
+      : "Delete Cooking Log";
+    const alertMsg = isScanOrFavorite
+      ? `Are you sure you want to permanently delete "${title}" from your saved recipes? (This will also unpin it if pinned)`
+      : `Are you sure you want to permanently delete "${title}" from your cooking history?`;
+
+    showAlert(alertTitle, alertMsg, "confirm", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const docRef = doc(db, `users/${userId}/${deleteCollection}`, id);
+            await deleteDoc(docRef);
+          } catch (err) {
+            console.error("Firestore Delete Recipe Error:", err);
+            showAlert(
+              "Error",
+              "Could not delete scanned recipe. Please check your network connection and try again.",
+              "error",
+            );
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   // Load recipe into global state & navigate
@@ -195,8 +262,31 @@ export default function VaultScreen() {
     router.push("/recipe-display");
   };
 
+  // Favorites matches (pinned scanned recipes)
+  const favoriteItems = scannedRecipes.filter((r) => r.isPinned);
+
+  // Map active subtab selection into a unified RecipePayload format
+  let rawList: RecipePayload[] = [];
+  if (activeSubTab === "scans") {
+    rawList = scannedRecipes;
+  } else if (activeSubTab === "cooked") {
+    rawList = cookedLogs.map((l) => ({
+      id: l.id,
+      title: l.recipe?.title || "",
+      prepTime: l.recipe?.prepTime || "N/A",
+      calories: l.recipe?.calories || "N/A",
+      ingredients: l.recipe?.ingredients || [],
+      instructions: l.recipe?.instructions || [],
+      totalProtein: l.recipe?.totalProtein,
+      totalCarbs: l.recipe?.totalCarbs,
+      totalFats: l.recipe?.totalFats || "0g",
+    }));
+  } else if (activeSubTab === "favorites") {
+    rawList = favoriteItems;
+  }
+
   // Filter recipes dynamically based on Search Query & Category Select
-  const filteredRecipes = scannedRecipes.filter((recipe) => {
+  const filteredRecipes = rawList.filter((recipe) => {
     const titleMatch = (recipe.title || "")
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
@@ -225,23 +315,32 @@ export default function VaultScreen() {
     setVisibleLimit(6);
   };
 
-  // Dynamic layout renderer (Grid vs List card styling)
-  const renderItem = ({ item }: { item: RecipePayload }) => {
+  const renderItem = ({
+    item,
+    index,
+  }: {
+    item: RecipePayload;
+    index: number;
+  }) => {
     const itemCategory = getRecipeCategory(item);
     const itemEmoji = CATEGORY_EMOJIS[itemCategory] || "🍲";
+    const GRADIENT_OPTIONS = [
+      ThemeGradients.cardYellow,
+      ThemeGradients.cardGreen,
+      ThemeGradients.cardPurple,
+      ThemeGradients.cardBlue,
+      ThemeGradients.cardPink,
+      ThemeGradients.cardOrange,
+      ThemeGradients.cardCyan,
+    ];
+    const gradient = GRADIENT_OPTIONS[index % GRADIENT_OPTIONS.length];
 
     if (layoutMode === "grid") {
       return (
-        <CardContainer
-          style={[styles.gridCard, { borderColor: colors.border }]}
-        >
+        <CardContainer gradient={gradient} style={[styles.gridCard]}>
           {item.isPinned && (
             <View style={styles.gridPinBadge}>
-              <Ionicons
-                name="bookmark"
-                size={12}
-                color={colors.primaryAccent}
-              />
+              <Ionicons name="bookmark" size={12} color="#1C1917" />
             </View>
           )}
           <TouchableOpacity
@@ -251,14 +350,17 @@ export default function VaultScreen() {
             <View
               style={[
                 styles.gridIconContainer,
-                { backgroundColor: mode === "light" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.08)" },
+                {
+                  backgroundColor: "rgba(0,0,0,0.05)",
+                  borderColor: "rgba(0,0,0,0.1)",
+                },
               ]}
             >
               <Text style={styles.gridEmoji}>{itemEmoji}</Text>
             </View>
             <Text
               numberOfLines={2}
-              style={[styles.gridTitle, { color: colors.textPrimary }]}
+              style={[styles.gridTitle, { color: "#1C1917" }]}
             >
               {item.title}
             </Text>
@@ -267,11 +369,14 @@ export default function VaultScreen() {
                 <Ionicons
                   name="time-outline"
                   size={12}
-                  color={colors.textSecondary}
+                  color="rgba(28, 25, 23, 0.7)"
                 />
                 <Text
                   numberOfLines={1}
-                  style={[styles.metaTextGrid, { color: colors.textSecondary }]}
+                  style={[
+                    styles.metaTextGrid,
+                    { color: "rgba(28, 25, 23, 0.7)" },
+                  ]}
                 >
                   {item.prepTime}
                 </Text>
@@ -280,11 +385,14 @@ export default function VaultScreen() {
                 <Ionicons
                   name="flame-outline"
                   size={12}
-                  color={colors.textSecondary}
+                  color="rgba(28, 25, 23, 0.7)"
                 />
                 <Text
                   numberOfLines={1}
-                  style={[styles.metaTextGrid, { color: colors.textSecondary }]}
+                  style={[
+                    styles.metaTextGrid,
+                    { color: "rgba(28, 25, 23, 0.7)" },
+                  ]}
                 >
                   {item.calories}
                 </Text>
@@ -292,7 +400,7 @@ export default function VaultScreen() {
             </View>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => handleDeleteScanned(item.id || "", item.title)}
+            onPress={() => handleDeleteRecipe(item.id || "", item.title)}
             style={styles.gridDeleteBtn}
           >
             <Ionicons name="trash-outline" size={16} color="#EA4335" />
@@ -303,15 +411,13 @@ export default function VaultScreen() {
 
     // List mode card styling
     return (
-      <CardContainer
-        style={[styles.recipeCard, { borderColor: colors.border }]}
-      >
+      <CardContainer gradient={gradient} style={[styles.recipeCard]}>
         <View
           style={[
             styles.listIconContainer,
             {
-              backgroundColor: mode === "light" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.08)",
-              borderColor: colors.border,
+              backgroundColor: "rgba(0,0,0,0.05)",
+              borderColor: "rgba(0,0,0,0.1)",
             },
           ]}
         >
@@ -322,7 +428,7 @@ export default function VaultScreen() {
           onPress={() => handleSelectRecipe(item)}
           style={styles.cardInfoContainer}
         >
-          <Text style={[styles.recipeTitle, { color: colors.textPrimary }]}>
+          <Text style={[styles.recipeTitle, { color: "#1C1917" }]}>
             {item.title}
           </Text>
           <View style={styles.metadataRow}>
@@ -330,9 +436,11 @@ export default function VaultScreen() {
               <Ionicons
                 name="time-outline"
                 size={14}
-                color={colors.textSecondary}
+                color="rgba(28, 25, 23, 0.7)"
               />
-              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+              <Text
+                style={[styles.metaText, { color: "rgba(28, 25, 23, 0.7)" }]}
+              >
                 {item.prepTime}
               </Text>
             </View>
@@ -340,35 +448,26 @@ export default function VaultScreen() {
               <Ionicons
                 name="flame-outline"
                 size={14}
-                color={colors.textSecondary}
+                color="rgba(28, 25, 23, 0.7)"
               />
-              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+              <Text
+                style={[styles.metaText, { color: "rgba(28, 25, 23, 0.7)" }]}
+              >
                 {item.calories}
               </Text>
             </View>
             <View
-              style={[
-                styles.tagBadge,
-                { backgroundColor: mode === "light" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.08)" },
-              ]}
+              style={[styles.tagBadge, { backgroundColor: "rgba(0,0,0,0.05)" }]}
             >
-              <Text style={[styles.tagText, { color: colors.textSecondary }]}>
+              <Text
+                style={[styles.tagText, { color: "rgba(28, 25, 23, 0.7)" }]}
+              >
                 {itemCategory}
               </Text>
             </View>
             {item.isPinned && (
-              <View
-                style={[
-                  styles.tagBadge,
-                  { backgroundColor: colors.primaryAccent },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.tagText,
-                    { color: mode === "light" ? "#FFFFFF" : "#000000" },
-                  ]}
-                >
+              <View style={[styles.tagBadge, { backgroundColor: "#1C1917" }]}>
+                <Text style={[styles.tagText, { color: "#FFFFFF" }]}>
                   Pinned
                 </Text>
               </View>
@@ -376,7 +475,7 @@ export default function VaultScreen() {
           </View>
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={() => handleDeleteScanned(item.id || "", item.title)}
+          onPress={() => handleDeleteRecipe(item.id || "", item.title)}
           style={styles.deleteBtn}
         >
           <Ionicons name="trash-outline" size={20} color="#EA4335" />
@@ -386,234 +485,175 @@ export default function VaultScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Title Header with custom inline grid and filter controls */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>
-            Scanned
-          </Text>
-          <View style={styles.controlsRow}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={[
-                styles.controlBtn,
-                { borderColor: colors.border, backgroundColor: colors.surface },
-              ]}
-              onPress={() =>
-                setLayoutMode((prev) => (prev === "grid" ? "list" : "grid"))
-              }
-            >
-              <Ionicons
-                name={layoutMode === "grid" ? "list-outline" : "grid-outline"}
-                size={16}
-                color={colors.primaryAccent}
-              />
-              <Text
-                style={[styles.controlBtnText, { color: colors.textPrimary }]}
-              >
-                {layoutMode === "grid" ? "List" : "Grid"}
-              </Text>
-            </TouchableOpacity>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: "transparent" }}
+      edges={["top"]}
+    >
+      <TabHeader title="Saved Recipes" subtitle="MY LIBRARY" />
 
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={[
-                styles.controlBtn,
-                { borderColor: colors.border, backgroundColor: colors.surface },
-                (searchQuery || selectedCategory !== "All") && {
-                  borderColor: colors.primaryAccent,
-                },
-              ]}
-              onPress={() => setIsFilterModalVisible(true)}
-            >
+      {/* Search Console directly on Screen */}
+      <View style={styles.searchContainer}>
+        <View
+          style={[
+            styles.searchWrapper,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Ionicons
+            name="search-outline"
+            size={18}
+            color={colors.textSecondary}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            placeholder="Search scans or ingredients..."
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            style={[styles.searchInput, { color: colors.textPrimary }]}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => handleSearchChange("")}>
               <Ionicons
-                name="funnel-outline"
-                size={16}
-                color={
-                  searchQuery || selectedCategory !== "All"
-                    ? colors.primaryAccent
-                    : colors.textSecondary
-                }
+                name="close-circle"
+                size={18}
+                color={colors.textSecondary}
+                style={styles.clearIcon}
               />
-              <Text
-                style={[
-                  styles.controlBtnText,
-                  {
-                    color:
-                      searchQuery || selectedCategory !== "All"
-                        ? colors.primaryAccent
-                        : colors.textPrimary,
-                  },
-                ]}
-              >
-                Filter {searchQuery || selectedCategory !== "All" ? "•" : ""}
-              </Text>
             </TouchableOpacity>
-          </View>
+          ) : null}
         </View>
+      </View>
 
-        {/* Search Console directly on Screen */}
-        <View style={styles.searchContainer}>
-          <View
+      <View style={[styles.container, { backgroundColor: "transparent" }]}>
+        <View style={styles.controlsRowOutside}>
+          <TouchableOpacity
+            activeOpacity={0.7}
             style={[
-              styles.searchWrapper,
-              { backgroundColor: colors.surface, borderColor: colors.border },
+              styles.controlBtn,
+              { borderColor: colors.border, backgroundColor: colors.surface },
             ]}
+            onPress={() =>
+              setLayoutMode((prev) => (prev === "grid" ? "list" : "grid"))
+            }
           >
             <Ionicons
-              name="search-outline"
-              size={18}
-              color={colors.textSecondary}
-              style={styles.searchIcon}
+              name={layoutMode === "grid" ? "list-outline" : "grid-outline"}
+              size={16}
+              color={colors.primaryAccent}
             />
-            <TextInput
-              placeholder="Search scans or ingredients..."
-              placeholderTextColor={colors.textSecondary}
-              value={searchQuery}
-              onChangeText={handleSearchChange}
-              style={[styles.searchInput, { color: colors.textPrimary }]}
-              autoCapitalize="none"
-              autoCorrect={false}
+            <Text
+              style={[styles.controlBtnText, { color: colors.textPrimary }]}
+            >
+              {layoutMode === "grid" ? "List" : "Grid"}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[
+              styles.controlBtn,
+              { borderColor: colors.border, backgroundColor: colors.surface },
+              (searchQuery || selectedCategory !== "All") && {
+                borderColor: colors.primaryAccent,
+              },
+            ]}
+            onPress={() => setIsFilterModalVisible(true)}
+          >
+            <Ionicons
+              name="funnel-outline"
+              size={16}
+              color={
+                searchQuery || selectedCategory !== "All"
+                  ? colors.primaryAccent
+                  : colors.textSecondary
+              }
             />
-            {searchQuery ? (
-              <TouchableOpacity onPress={() => handleSearchChange("")}>
-                <Ionicons
-                  name="close-circle"
-                  size={18}
-                  color={colors.textSecondary}
-                  style={styles.clearIcon}
-                />
-              </TouchableOpacity>
-            ) : null}
-          </View>
+            <Text
+              style={[
+                styles.controlBtnText,
+                {
+                  color:
+                    searchQuery || selectedCategory !== "All"
+                      ? colors.primaryAccent
+                      : colors.textPrimary,
+                },
+              ]}
+            >
+              Filter {searchQuery || selectedCategory !== "All" ? "•" : ""}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Slide-Up Custom Filter Bottom Sheet Modal */}
-        <Modal visible={isFilterModalVisible} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <View
-              style={[styles.modalContent, { backgroundColor: colors.surface }]}
-            >
-              {/* Modal Header */}
-              <View
+        {/* Sub-tabs row switcher */}
+        <View style={styles.subTabRow}>
+          {[
+            { id: "scans" as const, label: "Scans" },
+            { id: "cooked" as const, label: "Cooked" },
+            { id: "favorites" as const, label: "Favorites" },
+          ].map((tab) => {
+            const active = activeSubTab === tab.id;
+            return (
+              <TouchableOpacity
+                key={tab.id}
                 style={[
-                  styles.modalHeader,
-                  { borderBottomColor: colors.border },
+                  styles.subTabBtn,
+                  active && {
+                    borderBottomColor: colors.primaryAccent,
+                    borderBottomWidth: 2,
+                  },
                 ]}
+                onPress={() => setActiveSubTab(tab.id)}
               >
                 <Text
                   style={[
-                    styles.modalHeaderTitle,
-                    { color: colors.textPrimary },
+                    styles.subTabLabel,
+                    {
+                      color: active ? colors.textPrimary : colors.textSecondary,
+                    },
                   ]}
                 >
-                  Filter Scans
+                  {tab.label}
                 </Text>
-                <TouchableOpacity
-                  onPress={() => setIsFilterModalVisible(false)}
-                  style={styles.closeModalBtn}
-                >
-                  <Ionicons name="close" size={24} color={colors.textPrimary} />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                contentContainerStyle={styles.filterModalBody}
-                showsVerticalScrollIndicator={false}
-              >
-                {/* Category Section */}
-                <Text
-                  style={[
-                    styles.filterSectionTitle,
-                    { color: colors.textPrimary },
-                  ]}
-                >
-                  Dish Type Category
-                </Text>
-                <View style={styles.categoryGrid}>
-                  {CATEGORIES.map((category) => {
-                    const isActive = selectedCategory === category;
-                    return (
-                      <TouchableOpacity
-                        key={category}
-                        activeOpacity={0.8}
-                        onPress={() => handleCategorySelect(category)}
-                        style={[
-                          styles.modalCategoryChip,
-                          {
-                            backgroundColor: isActive
-                              ? colors.primaryAccent
-                              : colors.background,
-                            borderColor: isActive
-                              ? colors.primaryAccent
-                              : colors.border,
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.categoryChipText,
-                            {
-                              color: isActive
-                                ? colors.background
-                                : colors.textSecondary,
-                              fontWeight: isActive ? "700" : "500",
-                            },
-                          ]}
-                        >
-                          {CATEGORY_EMOJIS[category]} {category}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* Actions */}
-                <View style={styles.filterActionsRow}>
-                  <ActionButton
-                    title="Reset All"
-                    variant="outline"
-                    onPress={() => {
-                      handleSearchChange("");
-                      handleCategorySelect("All");
-                    }}
-                    style={styles.filterActionBtn}
-                  />
-                  <ActionButton
-                    title="Apply Filters"
-                    onPress={() => setIsFilterModalVisible(false)}
-                    style={styles.filterActionBtn}
-                  />
-                </View>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
         {/* Recipe Display */}
         {loading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={colors.primaryAccent} />
           </View>
-        ) : scannedRecipes.length === 0 ? (
+        ) : rawList.length === 0 ? (
           <View style={styles.centerContainer}>
             <CardContainer style={styles.emptyCard}>
               <Text style={styles.emptyStateEmoji}>🥑 📷 🍲 🍰</Text>
               <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-                No Scans Yet
+                {activeSubTab === "scans"
+                  ? "No Scans Yet"
+                  : activeSubTab === "cooked"
+                    ? "No Cooked Meals"
+                    : "No Favorites"}
               </Text>
               <Text
                 style={[styles.emptySubtitle, { color: colors.textSecondary }]}
               >
-                You haven't scanned any recipes yet. Take a picture of a recipe
-                or paste a URL link in the capture screen to get started!
+                {activeSubTab === "scans"
+                  ? "You haven't scanned any recipes yet. Take a picture of a recipe or paste a URL link in the capture screen to get started!"
+                  : activeSubTab === "cooked"
+                    ? "You haven't cooked any recipes yet. Start cooking from detail screens!"
+                    : "Cooked recipes with high ratings will automatically show up here."}
               </Text>
-              <ActionButton
-                title="Scan a Recipe"
-                onPress={() => router.push("/(tabs)/capture")}
-                style={styles.emptyBtn}
-              />
+              {activeSubTab === "scans" && (
+                <ActionButton
+                  title="Scan a Recipe"
+                  onPress={() => router.push("/(tabs)/capture")}
+                  style={styles.emptyBtn}
+                />
+              )}
             </CardContainer>
           </View>
         ) : filteredRecipes.length === 0 ? (
@@ -652,7 +692,11 @@ export default function VaultScreen() {
             key={layoutMode}
             numColumns={layoutMode === "grid" ? 2 : 1}
             data={paginatedRecipes}
-            keyExtractor={(item, index) => item.id ? `${item.id}-${index}` : String(index)}
+            keyExtractor={(item, index) =>
+              item.id
+                ? `${activeSubTab}-${item.id}-${index}`
+                : `${activeSubTab}-${index}`
+            }
             contentContainerStyle={[
               styles.listContent,
               layoutMode === "grid" && styles.gridListContent,
@@ -670,7 +714,7 @@ export default function VaultScreen() {
                   <Text
                     style={[styles.footerText, { color: colors.textSecondary }]}
                   >
-                    Showing {currentlyShowing} of {totalFiltered} scans
+                    Showing {currentlyShowing} of {totalFiltered} items
                   </Text>
                   {totalFiltered > visibleLimit ? (
                     <ActionButton
@@ -687,13 +731,116 @@ export default function VaultScreen() {
         )}
       </View>
 
+      {/* Slide-Up Custom Filter Bottom Sheet Modal */}
+      <Modal visible={isFilterModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalContent,
+              {
+                backgroundColor: colors.background,
+                height: "85%",
+                paddingBottom: 40,
+              },
+            ]}
+          >
+            {/* Modal Header */}
+            <View
+              style={[styles.modalHeader, { borderBottomColor: colors.border }]}
+            >
+              <Text
+                style={[styles.modalHeaderTitle, { color: colors.textPrimary }]}
+              >
+                Filter Recipes
+              </Text>
+              <TouchableOpacity
+                onPress={() => setIsFilterModalVisible(false)}
+                style={styles.closeModalBtn}
+              >
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.filterModalBody}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Category Section */}
+              <Text
+                style={[
+                  styles.filterSectionTitle,
+                  { color: colors.textPrimary },
+                ]}
+              >
+                Dish Type Category
+              </Text>
+              <View style={styles.categoryGrid}>
+                {CATEGORIES.map((category) => {
+                  const isActive = selectedCategory === category;
+                  return (
+                    <TouchableOpacity
+                      key={category}
+                      activeOpacity={0.8}
+                      onPress={() => handleCategorySelect(category)}
+                      style={[
+                        styles.modalCategoryChip,
+                        {
+                          backgroundColor: isActive
+                            ? colors.primaryAccent
+                            : colors.background,
+                          borderColor: isActive
+                            ? colors.primaryAccent
+                            : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.categoryChipText,
+                          {
+                            color: isActive
+                              ? colors.background
+                              : colors.textSecondary,
+                            fontWeight: isActive ? "700" : "500",
+                          },
+                        ]}
+                      >
+                        {CATEGORY_EMOJIS[category]} {category}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Actions */}
+              <View style={styles.filterActionsRow}>
+                <ActionButton
+                  title="Reset All"
+                  variant="outline"
+                  onPress={() => {
+                    handleSearchChange("");
+                    handleCategorySelect("All");
+                  }}
+                  style={styles.filterActionBtn}
+                />
+                <ActionButton
+                  title="Apply Filters"
+                  onPress={() => setIsFilterModalVisible(false)}
+                  style={styles.filterActionBtn}
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <CustomAlert
         visible={alertConfig.visible}
         title={alertConfig.title}
         message={alertConfig.message}
         type={alertConfig.type}
         buttons={alertConfig.buttons}
-        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+        onClose={() => setAlertConfig((prev) => ({ ...prev, visible: false }))}
       />
     </SafeAreaView>
   );
@@ -701,26 +848,20 @@ export default function VaultScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 16,
+    flex: 1,
   },
-  header: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  searchContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 14,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: -0.5,
-    marginBottom: 12,
-  },
-  controlsRow: {
+  controlsRowOutside: {
     flexDirection: "row",
     gap: 10,
     alignItems: "center",
+    paddingHorizontal: 20,
+    marginTop: 14,
+    marginBottom: 10,
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 0,
   },
   controlBtn: {
     flexDirection: "row",
@@ -873,14 +1014,13 @@ const styles = StyleSheet.create({
   },
   gridRowWrapper: {
     justifyContent: "space-between",
-    marginBottom: 12,
+    // marginBottom: 12,
   },
   recipeCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     padding: 20,
-    marginBottom: 16,
     borderRadius: 24,
   },
   cardInfoContainer: {
@@ -1009,5 +1149,21 @@ const styles = StyleSheet.create({
   loadMoreBtn: {
     width: "100%",
     height: 48,
+  },
+  subTabRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderColor: "#E5E5EA",
+    marginBottom: 6,
+    marginHorizontal: 20,
+  },
+  subTabBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  subTabLabel: {
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

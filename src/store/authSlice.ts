@@ -4,12 +4,14 @@ interface AuthState {
   isLoggedIn: boolean;
   uid: string | null;
   email: string | null;
+  hasCompletedPostLoginSetup: boolean;
 }
 
 const initialState: AuthState = {
   isLoggedIn: false,
   uid: null,
   email: null,
+  hasCompletedPostLoginSetup: false,
 };
 
 export const authSlice = createSlice({
@@ -25,9 +27,13 @@ export const authSlice = createSlice({
       state.isLoggedIn = false;
       state.uid = null;
       state.email = null;
+      state.hasCompletedPostLoginSetup = false;
     },
+    completePostLoginSetup: (state) => {
+      state.hasCompletedPostLoginSetup = true;
+    }
   },
 });
 
-export const { login, logout } = authSlice.actions;
+export const { login, logout, completePostLoginSetup } = authSlice.actions;
 export default authSlice.reducer;

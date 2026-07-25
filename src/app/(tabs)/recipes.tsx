@@ -1,36 +1,36 @@
-import React, { useEffect, useState } from "react";
-import {
-  StyleSheet,
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  TextInput,
-  ScrollView,
-  Modal,
-} from "react-native";
-import { useSelector, useDispatch } from "react-redux";
-import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useRouter } from "expo-router";
 import {
   collection,
   doc,
-  deleteDoc,
   onSnapshot,
-  query,
   orderBy,
+  query,
   updateDoc,
 } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useDispatch, useSelector } from "react-redux";
 
-import { RootState } from "@/store";
-import { ThemeColors } from "@/theme/colors";
-import { CardContainer } from "@/components/CardContainer";
 import { ActionButton } from "@/components/ActionButton";
-import { db } from "@/services/firebase";
-import { setActiveRecipe, RecipePayload } from "@/store/recipeSlice";
+import { CardContainer } from "@/components/CardContainer";
 import { CustomAlert } from "@/components/CustomAlert";
+import { TabHeader } from "@/components/TabHeader";
+import { db } from "@/services/firebase";
+import { RootState } from "@/store";
+import { RecipePayload, setActiveRecipe } from "@/store/recipeSlice";
+import { ThemeColors } from "@/theme/colors";
 
 const CATEGORY_EMOJIS: Record<string, string> = {
   All: "🍽️",
@@ -72,15 +72,23 @@ export default function RecipesScreen() {
     visible: boolean;
     title: string;
     message: string;
-    type?: 'info' | 'success' | 'error' | 'confirm';
-    buttons?: Array<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }>;
-  }>({ visible: false, title: '', message: '' });
+    type?: "info" | "success" | "error" | "confirm";
+    buttons?: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }>;
+  }>({ visible: false, title: "", message: "" });
 
   const showAlert = (
     title: string,
     message: string,
-    type: 'info' | 'success' | 'error' | 'confirm' = 'info',
-    buttons?: Array<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }>
+    type: "info" | "success" | "error" | "confirm" = "info",
+    buttons?: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }>,
   ) => {
     setAlertConfig({ visible: true, title, message, type, buttons });
   };
@@ -187,12 +195,12 @@ export default function RecipesScreen() {
               showAlert(
                 "Error",
                 "Could not unpin the recipe. Please check your internet connection and try again.",
-                "error"
+                "error",
               );
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -249,7 +257,12 @@ export default function RecipesScreen() {
             <View
               style={[
                 styles.gridIconContainer,
-                { backgroundColor: mode === "light" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.08)" },
+                {
+                  backgroundColor:
+                    mode === "light"
+                      ? "rgba(0,0,0,0.05)"
+                      : "rgba(255,255,255,0.08)",
+                },
               ]}
             >
               <Text style={styles.gridEmoji}>{itemEmoji}</Text>
@@ -308,7 +321,10 @@ export default function RecipesScreen() {
           style={[
             styles.listIconContainer,
             {
-              backgroundColor: mode === "light" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.08)",
+              backgroundColor:
+                mode === "light"
+                  ? "rgba(0,0,0,0.05)"
+                  : "rgba(255,255,255,0.08)",
               borderColor: colors.border,
             },
           ]}
@@ -347,7 +363,12 @@ export default function RecipesScreen() {
             <View
               style={[
                 styles.tagBadge,
-                { backgroundColor: mode === "light" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.08)" },
+                {
+                  backgroundColor:
+                    mode === "light"
+                      ? "rgba(0,0,0,0.05)"
+                      : "rgba(255,255,255,0.08)",
+                },
               ]}
             >
               <Text style={[styles.tagText, { color: colors.textSecondary }]}>
@@ -367,71 +388,69 @@ export default function RecipesScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Title Header with custom inline grid and filter controls */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>
-            My Recipes
-          </Text>
-          <View style={styles.controlsRow}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={[
-                styles.controlBtn,
-                { borderColor: colors.border, backgroundColor: colors.surface },
-              ]}
-              onPress={() =>
-                setLayoutMode((prev) => (prev === "grid" ? "list" : "grid"))
-              }
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: "transparent" }}
+      edges={["top"]}
+    >
+      <TabHeader title="My Recipes" subtitle="CULINARY SAVES" />
+      <View style={[styles.container, { backgroundColor: "transparent" }]}>
+        <View style={styles.controlsRowOutside}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[
+              styles.controlBtn,
+              { borderColor: colors.border, backgroundColor: colors.surface },
+            ]}
+            onPress={() =>
+              setLayoutMode((prev) => (prev === "grid" ? "list" : "grid"))
+            }
+          >
+            <Ionicons
+              name={layoutMode === "grid" ? "list-outline" : "grid-outline"}
+              size={16}
+              color={colors.primaryAccent}
+            />
+            <Text
+              style={[styles.controlBtnText, { color: colors.textPrimary }]}
             >
-              <Ionicons
-                name={layoutMode === "grid" ? "list-outline" : "grid-outline"}
-                size={16}
-                color={colors.primaryAccent}
-              />
-              <Text
-                style={[styles.controlBtnText, { color: colors.textPrimary }]}
-              >
-                {layoutMode === "grid" ? "List" : "Grid"}
-              </Text>
-            </TouchableOpacity>
+              {layoutMode === "grid" ? "List" : "Grid"}
+            </Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.7}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[
+              styles.controlBtn,
+              { borderColor: colors.border, backgroundColor: colors.surface },
+              (searchQuery || selectedCategory !== "All") && {
+                borderColor: colors.primaryAccent,
+              },
+            ]}
+            onPress={() => setIsFilterModalVisible(true)}
+          >
+            <Ionicons
+              name="funnel-outline"
+              size={16}
+              color={
+                searchQuery || selectedCategory !== "All"
+                  ? colors.primaryAccent
+                  : colors.textSecondary
+              }
+            />
+            <Text
               style={[
-                styles.controlBtn,
-                { borderColor: colors.border, backgroundColor: colors.surface },
-                (searchQuery || selectedCategory !== "All") && {
-                  borderColor: colors.primaryAccent,
+                styles.controlBtnText,
+                {
+                  color:
+                    searchQuery || selectedCategory !== "All"
+                      ? colors.primaryAccent
+                      : colors.textPrimary,
                 },
               ]}
-              onPress={() => setIsFilterModalVisible(true)}
             >
-              <Ionicons
-                name="funnel-outline"
-                size={16}
-                color={
-                  searchQuery || selectedCategory !== "All"
-                    ? colors.primaryAccent
-                    : colors.textSecondary
-                }
-              />
-              <Text
-                style={[
-                  styles.controlBtnText,
-                  {
-                    color:
-                      searchQuery || selectedCategory !== "All"
-                        ? colors.primaryAccent
-                        : colors.textPrimary,
-                  },
-                ]}
-              >
-                Filter {searchQuery || selectedCategory !== "All" ? "•" : ""}
-              </Text>
-            </TouchableOpacity>
-          </View>
+              Filter {searchQuery || selectedCategory !== "All" ? "•" : ""}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Search Console directly on Screen */}
@@ -474,7 +493,14 @@ export default function RecipesScreen() {
         <Modal visible={isFilterModalVisible} animationType="slide" transparent>
           <View style={styles.modalOverlay}>
             <View
-              style={[styles.modalContent, { backgroundColor: colors.surface }]}
+              style={[
+                styles.modalContent,
+                {
+                  backgroundColor: colors.background,
+                  height: "85%",
+                  paddingBottom: 40,
+                },
+              ]}
             >
               {/* Modal Header */}
               <View
@@ -633,7 +659,9 @@ export default function RecipesScreen() {
             key={layoutMode}
             numColumns={layoutMode === "grid" ? 2 : 1}
             data={paginatedRecipes}
-            keyExtractor={(item, index) => item.id ? `${item.id}-${index}` : String(index)}
+            keyExtractor={(item, index) =>
+              item.id ? `${item.id}-${index}` : String(index)
+            }
             contentContainerStyle={[
               styles.listContent,
               layoutMode === "grid" && styles.gridListContent,
@@ -674,7 +702,7 @@ export default function RecipesScreen() {
         message={alertConfig.message}
         type={alertConfig.type}
         buttons={alertConfig.buttons}
-        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+        onClose={() => setAlertConfig((prev) => ({ ...prev, visible: false }))}
       />
     </SafeAreaView>
   );
@@ -683,26 +711,18 @@ export default function RecipesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 16,
   },
-  header: {
+  controlsRowOutside: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginTop: 14,
+    marginBottom: 10,
   },
   searchContainer: {
     paddingHorizontal: 20,
     marginBottom: 14,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: -0.5,
-    marginBottom: 12,
-  },
-  controlsRow: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
   },
   controlBtn: {
     flexDirection: "row",

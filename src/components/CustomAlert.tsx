@@ -76,7 +76,7 @@ export function CustomAlert({
         <View
           style={[
             styles.alertBox,
-            { backgroundColor: colors.surface, borderColor: colors.border },
+            { backgroundColor: colors.background, borderColor: colors.border },
           ]}
         >
           {/* Top Decorative Icon */}
@@ -166,20 +166,9 @@ const styles = StyleSheet.create({
   alertBox: {
     width: Math.min(width * 0.85, 340),
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 0.5,
     alignItems: "center",
     overflow: "hidden",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 6,
-      },
-    }),
   },
   iconContainer: {
     width: 64,

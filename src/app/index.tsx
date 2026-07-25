@@ -11,7 +11,7 @@ export default function Index() {
   const colors = ThemeColors[mode];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: "transparent" }]}>
       {/* Brand Icon Circle */}
       <View
         style={[

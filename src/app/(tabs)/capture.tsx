@@ -24,9 +24,14 @@ import { db } from "@/services/firebase";
 import { extractRecipe } from "@/services/gemini";
 import { RootState } from "@/store";
 import { setActiveRecipe } from "@/store/recipeSlice";
-import { incrementFreeScan, checkMonthRollover } from "@/store/subscriptionSlice";
-import { ThemeColors } from "@/theme/colors";
+import { TabHeader } from "@/components/TabHeader";
+import {
+  checkMonthRollover,
+  incrementFreeScan,
+} from "@/store/subscriptionSlice";
+import { ThemeColors, ThemeGradients } from "@/theme/colors";
 import { useNetInfo } from "@react-native-community/netinfo";
+import { LinearGradient } from "expo-linear-gradient";
 
 export default function CaptureScreen() {
   const router = useRouter();
@@ -34,9 +39,15 @@ export default function CaptureScreen() {
   const mode = useSelector((state: RootState) => state.theme.mode);
   const colors = ThemeColors[mode];
   const userId = useSelector((state: RootState) => state.auth.uid);
-  const isPremium = useSelector((state: RootState) => state.subscription.isPremium);
-  const freeScansUsed = useSelector((state: RootState) => state.subscription.freeScansUsed);
-  const currentMonth = useSelector((state: RootState) => state.subscription.currentMonth);
+  const isPremium = useSelector(
+    (state: RootState) => state.subscription.isPremium,
+  );
+  const freeScansUsed = useSelector(
+    (state: RootState) => state.subscription.freeScansUsed,
+  );
+  const currentMonth = useSelector(
+    (state: RootState) => state.subscription.currentMonth,
+  );
   const netInfo = useNetInfo();
 
   const [recipeLink, setRecipeLink] = useState("");
@@ -196,15 +207,15 @@ export default function CaptureScreen() {
 
     if (!isPremium) {
       const today = new Date();
-      const currentMonthStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+      const currentMonthStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, "0")}`;
       let effectiveScans = freeScansUsed;
       if (currentMonth !== currentMonthStr) {
         effectiveScans = 0;
         dispatch(checkMonthRollover());
       }
-      
+
       if (effectiveScans >= 3) {
-        router.push('/paywall');
+        router.push("/paywall");
         return;
       }
     }
@@ -292,26 +303,20 @@ export default function CaptureScreen() {
 
   return (
     <SafeAreaView
-      style={{ flex: 1, backgroundColor: colors.background }}
+      style={{ flex: 1, backgroundColor: "transparent" }}
       edges={["top"]}
     >
+      <TabHeader title="Scan & Import" subtitle="ADD RECIPE" />
+
       <ScrollView
-        style={[styles.container, { backgroundColor: colors.background }]}
+        style={[styles.container, { backgroundColor: "transparent" }]}
         contentContainerStyle={[styles.scrollContent]}
       >
-        {/* Premium Minimalist Welcome Header */}
-        <View style={styles.header}>
-          <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>
-            CULINARY KITCHEN
-          </Text>
-          <Text style={[styles.appTitle, { color: colors.textPrimary }]}>
-            RecipeFetch
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Transform any cooking website link or cookbook photo into a clean,
-            beautifully formatted recipe page instantly.
-          </Text>
-        </View>
+        {/* Description/Instruction text at the top of content */}
+        <Text style={[styles.descriptionText, { color: colors.textSecondary }]}>
+          Transform any cooking website link or cookbook photo into a clean,
+          beautifully formatted recipe page instantly.
+        </Text>
 
         {/* Modern Minimal Link Field */}
         <View style={styles.sectionContainer}>
@@ -479,145 +484,65 @@ export default function CaptureScreen() {
             <View style={styles.scannerRow}>
               <TouchableOpacity
                 activeOpacity={0.7}
-                style={[
-                  styles.scannerHalfCard,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                  colors.cardShadow,
-                ]}
                 onPress={triggerCamera}
+                style={{ flex: 1 }}
               >
-                <View
-                  style={[
-                    styles.scannerIconWrapper,
-                    {
-                      backgroundColor:
-                        mode === "light"
-                          ? "rgba(0,0,0,0.03)"
-                          : "rgba(255,255,255,0.04)",
-                      borderColor: colors.border,
-                    },
-                  ]}
+                <LinearGradient
+                  colors={ThemeGradients.cardOrange}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={[styles.scannerHalfCard, { borderColor: colors.border }]}
                 >
-                  <Ionicons
-                    name="camera-outline"
-                    size={22}
-                    color={colors.primaryAccent}
-                  />
-                </View>
-
-                <Text
-                  style={[styles.scannerLabel, { color: colors.textPrimary }]}
-                >
-                  Camera
-                </Text>
-                <Text
-                  style={[
-                    styles.scannerSublabel,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  Scan cookbook page
-                </Text>
+                  <View style={[styles.scannerIconWrapper, { backgroundColor: 'rgba(0,0,0,0.05)', borderColor: colors.border }]}>
+                    <Ionicons name="camera-outline" size={22} color="#1C1917" />
+                  </View>
+                  <Text style={[styles.scannerLabel, { color: "#1C1917" }]}>Camera</Text>
+                  <Text style={[styles.scannerSublabel, { color: "rgba(28, 25, 23, 0.7)" }]}>Scan cookbook page</Text>
+                </LinearGradient>
               </TouchableOpacity>
 
               <TouchableOpacity
                 activeOpacity={0.7}
-                style={[
-                  styles.scannerHalfCard,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                  colors.cardShadow,
-                ]}
                 onPress={triggerGallery}
+                style={{ flex: 1 }}
               >
-                <View
-                  style={[
-                    styles.scannerIconWrapper,
-                    {
-                      backgroundColor:
-                        mode === "light"
-                          ? "rgba(0,0,0,0.03)"
-                          : "rgba(255,255,255,0.04)",
-                      borderColor: colors.border,
-                    },
-                  ]}
+                <LinearGradient
+                  colors={ThemeGradients.cardBlue}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={[styles.scannerHalfCard, { borderColor: colors.border }]}
                 >
-                  <Ionicons
-                    name="images-outline"
-                    size={22}
-                    color={colors.primaryAccent}
-                  />
-                </View>
-
-                <Text
-                  style={[styles.scannerLabel, { color: colors.textPrimary }]}
-                >
-                  Gallery
-                </Text>
-                <Text
-                  style={[
-                    styles.scannerSublabel,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  Upload from library
-                </Text>
+                  <View style={[styles.scannerIconWrapper, { backgroundColor: 'rgba(0,0,0,0.05)', borderColor: colors.border }]}>
+                    <Ionicons name="images-outline" size={22} color="#1C1917" />
+                  </View>
+                  <Text style={[styles.scannerLabel, { color: "#1C1917" }]}>Gallery</Text>
+                  <Text style={[styles.scannerSublabel, { color: "rgba(28, 25, 23, 0.7)" }]}>Upload from library</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
+
           )}
 
           {/* Manual Creation Card */}
           <TouchableOpacity
             activeOpacity={0.7}
-            style={[
-              styles.manualInputCard,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-              },
-              colors.cardShadow,
-            ]}
-            onPress={() => router.push('/manual-recipe')}
+            onPress={() => router.push("/manual-recipe")}
+            style={{ marginTop: 12 }}
           >
-            <View style={styles.manualRow}>
-              <View
-                style={[
-                  styles.scannerIconWrapper,
-                  {
-                    backgroundColor:
-                      mode === "light"
-                        ? "rgba(0,0,0,0.03)"
-                        : "rgba(255,255,255,0.04)",
-                    borderColor: colors.border,
-                    marginRight: 14,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="create-outline"
-                  size={20}
-                  color={colors.primaryAccent}
-                />
+            <LinearGradient
+              colors={ThemeGradients.cardPink}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={[styles.manualInputCard, { borderColor: colors.border }]}
+            >
+              <View style={styles.manualRow}>
+                <View style={[styles.scannerIconWrapper, { backgroundColor: 'rgba(0,0,0,0.05)', borderColor: colors.border, marginRight: 14 }]}>
+                  <Ionicons name="create-outline" size={20} color="#1C1917" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.scannerLabel, { color: "#1C1917" }]}>Manual Creation</Text>
+                  <Text style={[styles.scannerSublabel, { color: "rgba(28, 25, 23, 0.7)" }]}>Type raw recipe details</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(28, 25, 23, 0.5)" />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.scannerLabel, { color: colors.textPrimary }]}>
-                  Manual Creation
-                </Text>
-                <Text style={[styles.scannerSublabel, { color: colors.textSecondary }]}>
-                  Type raw recipe details and let AI format them
-                </Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={colors.textSecondary}
-              />
-            </View>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -634,7 +559,7 @@ export default function CaptureScreen() {
             <View
               style={[
                 styles.overlayContent,
-                { backgroundColor: colors.surface, borderColor: colors.border },
+                { backgroundColor: colors.background, borderColor: colors.border },
               ]}
             >
               <ActivityIndicator size="small" color={colors.primaryAccent} />
@@ -675,24 +600,10 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 60,
   },
-  header: {
-    marginBottom: 24,
-  },
-  welcomeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1.5,
-  },
-  appTitle: {
-    fontSize: 32,
-    fontWeight: "800",
-    marginTop: 4,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
+  descriptionText: {
     fontSize: 14,
-    marginTop: 8,
     lineHeight: 20,
+    marginBottom: 20,
   },
   sectionContainer: {
     marginBottom: 18,

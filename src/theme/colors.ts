@@ -2,35 +2,47 @@ import { StyleSheet } from 'react-native';
 
 export const ThemeColors = {
   light: {
-    background: '#F2F2F7',      // Soft Apple System Background (eliminates blinding white)
-    surface: '#FFFFFF',         // Pure White Cards for elevated contrast
-    textPrimary: '#000000',     // Pure Black
-    textSecondary: '#6E6E73',   // Sleek iOS Slate Gray for subheadings
-    primaryAccent: '#000000',   // High-contrast Pure Black buttons/accents
-    successGreen: '#000000',    // Minimal Black checkboxes
-    border: '#E5E5EA',          // Apple Light Gray borders
+    background: '#FAF8F5',
+    surface: '#FFFFFF',
+    textPrimary: '#1C1917',
+    textSecondary: '#6E6A66',
+    primaryAccent: '#3B82F6', // Fresh Electric Blue
+    successGreen: '#10B981',
+    border: '#E2E8F0', // Light gray border
     cardShadow: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 4,
-      elevation: 1,
+      borderWidth: 0.5,
+      borderColor: '#E2E8F0',
+      shadowColor: 'transparent',
+      elevation: 0,
     }
   },
   dark: {
-    background: '#0B1120',      // Deep Midnight Navy Background (Revolut/Monzo style)
-    surface: '#151E32',         // Elevated Rich Navy Surface
-    textPrimary: '#FFFFFF',     // Pure White
-    textSecondary: '#94A3B8',   // Crisp Blue-Gray for secondary text
-    primaryAccent: '#FFFFFF',   // High-contrast Pure White buttons/accents
-    successGreen: '#FFFFFF',    // Minimal White checkboxes
-    border: '#233253',          // Soft Navy borders
+    background: '#0F172A',      // Fresh slate/ocean dark
+    surface: 'rgba(255, 255, 255, 0.08)',       // Glassy transparent card
+    textPrimary: '#FFFFFF',     // Pure white main titles
+    textSecondary: '#94A3B8',   // Soft light gray descriptions
+    primaryAccent: '#60A5FA',   // Fresh light blue base
+    successGreen: '#34D399',    // Emerald green
+    border: 'rgba(96, 165, 250, 0.2)', // Electric blue tinted border
     cardShadow: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.4,
-      shadowRadius: 12,
-      elevation: 4,
+      borderWidth: 0.5,
+      borderColor: 'rgba(96, 165, 250, 0.3)',
+      shadowColor: 'transparent',
+      elevation: 0,
     }
   }
+};
+
+export const ThemeGradients = {
+  primary: ['#60A5FA', '#2563EB'] as const, 
+  bgDarkShift1: ['#0F172A', '#1E3A8A', '#0F172A', '#020617'] as const, // Fresh Ocean
+  bgDarkShift2: ['#020617', '#0F172A', '#1D4ED8', '#0F172A'] as const,
+  
+  cardYellow: ['#FDE047', '#F59E0B'] as const,
+  cardGreen: ['#86EFAC', '#10B981'] as const,
+  cardPurple: ['#D8B4FE', '#8B5CF6'] as const,
+  cardBlue: ['#93C5FD', '#3B82F6'] as const,
+  cardPink: ['#F9A8D4', '#EC4899'] as const,
+  cardOrange: ['#FDBA74', '#EA580C'] as const,
+  cardCyan: ['#67E8F9', '#06B6D4'] as const,
 };

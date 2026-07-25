@@ -22,7 +22,8 @@ export default function TabLayout() {
 
   return (
     <NativeTabs
-      backgroundColor={colors.surface}
+      // The user wants a static background color. We use the deep Slate/Ocean background.
+      backgroundColor={colors.background}
       indicatorColor={isIOS ? undefined : (mode === 'light' ? `${colors.primaryAccent}26` : `${colors.primaryAccent}4D`)}
       tintColor={colors.primaryAccent}
       rippleColor={isIOS ? undefined : (mode === 'light' ? `${colors.primaryAccent}1A` : `${colors.primaryAccent}33`)}
@@ -33,18 +34,27 @@ export default function TabLayout() {
       labelStyle={{ 
         selected: { 
           color: colors.primaryAccent,
-          fontSize: 12,
+          fontSize: 10,
           fontWeight: '700',
         },
         default: { 
           color: colors.textSecondary,
-          fontSize: 12,
+          fontSize: 10,
           fontWeight: '500',
         }
       }}
     >
+      <NativeTabs.Trigger name="home" labelVisibilityMode="labeled">
+        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'house', selected: 'house.fill' }}
+          md="home"
+          src={require('@/assets/images/tabIcons/home.png')}
+        />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="capture" labelVisibilityMode="labeled">
-        <NativeTabs.Trigger.Label>Extract</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Scan</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           sf={{ default: 'viewfinder', selected: 'viewfinder' }}
           md="crop_free"
@@ -52,29 +62,29 @@ export default function TabLayout() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="recipes" labelVisibilityMode="labeled">
-        <NativeTabs.Trigger.Label>My Recipes</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="pantry" labelVisibilityMode="labeled">
+        <NativeTabs.Trigger.Label>What to Cook</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          sf={{ default: 'bookmark', selected: 'bookmark.fill' }}
-          md="bookmark"
+          sf={{ default: 'fork.knife', selected: 'fork.knife' }}
+          md="kitchen"
+          src={require('@/assets/images/tabIcons/explore.png')}
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="planner" labelVisibilityMode="labeled">
+        <NativeTabs.Trigger.Label>Planner</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'calendar', selected: 'calendar' }}
+          md="calendar_today"
           src={require('@/assets/images/tabIcons/explore.png')}
         />
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="vault" labelVisibilityMode="labeled">
-        <NativeTabs.Trigger.Label>Scanned</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Saved</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          sf={{ default: 'clock.arrow.circlepath', selected: 'clock.arrow.circlepath' }}
+          sf={{ default: 'book', selected: 'book.fill' }}
           md="history"
-          src={require('@/assets/images/tabIcons/explore.png')}
-        />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="preferences" labelVisibilityMode="labeled">
-        <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          sf={{ default: 'person', selected: 'person.fill' }}
-          md="person"
           src={require('@/assets/images/tabIcons/explore.png')}
         />
       </NativeTabs.Trigger>
