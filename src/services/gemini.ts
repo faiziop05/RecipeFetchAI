@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Retrieve the Gemini API key from environment variables
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
@@ -33,10 +33,13 @@ const CLOUD_PROXY_PROVIDER = {
   model: "qwen3:14b",
 };
 
+/**
+ * Calls Gemini / Cloud Proxy models and returns raw text response (token-efficient).
+ */
 async function callWithRetry(
   buildRequest: (modelName: string) => Promise<any>,
   promptText: string,
-): Promise<any> {
+): Promise<string> {
   let lastError: any = null;
 
   if (genAI) {
@@ -49,7 +52,7 @@ async function callWithRetry(
         console.log(`[Gemini] Attempting request using model: ${modelName}...`);
         const result = await buildRequest(modelName);
         console.log(`[Gemini] Success on model ${modelName}!`);
-        return JSON.parse(result.response.text());
+        return result.response.text();
       } catch (err: any) {
         lastError = err;
         console.warn(
@@ -58,10 +61,10 @@ async function callWithRetry(
           err,
         );
 
-        // Detect critical authentication issues that cannot be resolved by cascading
         const isAuthError =
           err?.message?.includes("API_KEY_INVALID") ||
           err?.message?.includes("API key not valid") ||
+          err?.message?.includes("leaked") ||
           err?.status === 403;
 
         if (isAuthError) {
@@ -104,6 +107,20 @@ async function callWithRetry(
     );
   }
 
+  // Handle specific leaked/invalid API key error cleanly
+  const isLeakedKey =
+    lastError?.message?.includes("leaked") ||
+    lastError?.message?.includes("API_KEY_INVALID") ||
+    lastError?.status === 403;
+
+  if (isLeakedKey) {
+    throw new Error(
+      "🔑 API Key Revoked / Leaked\n\n" +
+        "Google automatically revoked your Gemini API key because it was detected in a public repository.\n\n" +
+        "Fix: Get a new free key at https://aistudio.google.com/app/apikey and paste it into `.env` under `EXPO_PUBLIC_GEMINI_API_KEY`.",
+    );
+  }
+
   if (!CLOUD_PROXY_PROVIDER.key) {
     const missingKeysMsg =
       `No operational API keys found.\n` +
@@ -132,7 +149,6 @@ async function callWithRetry(
         model: CLOUD_PROXY_PROVIDER.model,
         prompt: promptText,
         stream: false,
-        options: { response_format: { type: "json" } },
       }),
     });
 
@@ -153,7 +169,7 @@ async function callWithRetry(
     console.log(
       `[Fallback] Successfully received response from ${CLOUD_PROXY_PROVIDER.name}.`,
     );
-    return JSON.parse(data.response);
+    return data.response;
   } catch (proxyError: any) {
     console.warn(
       "[Fallback] Cloud Proxy failed as well:",
@@ -172,7 +188,377 @@ async function callWithRetry(
     throw finalError;
   }
 }
+
+// ─── Compact Text Parsers ───────────────────────────────────────────────────
+
+/**
+ * Parses a single compact text recipe into a structured JSON/JS Object.
+ * Fallback to JSON.parse if LLM returns JSON.
+ */
+export function parseCompactRecipeText(text: string): any {
+  if (!text) throw new Error("Empty AI response received.");
+
+  const trimmed = text.trim();
+
+  // 1. Try parsing JSON if LLM returned JSON directly or inside markdown ```json ... ```
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      const json = JSON.parse(trimmed);
+      if (json && (json.title || json.ingredients)) return json;
+    } catch (e) {}
+  }
+
+  const jsonBlockMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (jsonBlockMatch) {
+    try {
+      const json = JSON.parse(jsonBlockMatch[1]);
+      if (json && (json.title || json.ingredients)) return json;
+    } catch (e) {}
+  }
+
+  // 2. Parse custom compact line-based text format
+  const lines = trimmed.split("\n");
+  let title = "";
+  let prepTime = "20 mins";
+  let calories = "0 kcal";
+  let totalProtein = "0g";
+  let totalCarbs = "0g";
+  let totalFats = "0g";
+
+  const ingredients: any[] = [];
+  const instructions: string[] = [];
+
+  let currentSection: "header" | "ingredient" | "instructions" = "header";
+  let currentIng: any = null;
+
+  for (let rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const lower = line.toLowerCase();
+
+    // Section markers
+    if (
+      lower.startsWith("---ingredient---") ||
+      lower.startsWith("---ingredients---") ||
+      lower.startsWith("===ingredient===") ||
+      lower.startsWith("===ingredients===")
+    ) {
+      if (currentIng && currentIng.name) {
+        ingredients.push(currentIng);
+      }
+      currentIng = {
+        name: "",
+        amount: "1 unit",
+        description: "",
+        nutrition: { calories: "0 kcal", protein: "0g", carbs: "0g", fat: "0g" },
+        sourcingAdvantage: "",
+      };
+      currentSection = "ingredient";
+      continue;
+    }
+
+    if (
+      lower.startsWith("---instruction") ||
+      lower.startsWith("---instructions") ||
+      lower.startsWith("===instruction") ||
+      lower.startsWith("===instructions")
+    ) {
+      if (currentIng && currentIng.name) {
+        ingredients.push(currentIng);
+        currentIng = null;
+      }
+      currentSection = "instructions";
+      continue;
+    }
+
+    // Line parsing based on current section
+    if (currentSection === "header") {
+      if (lower.startsWith("title:")) title = line.substring(6).trim();
+      else if (lower.startsWith("prep:") || lower.startsWith("preptime:"))
+        prepTime = line.substring(line.indexOf(":") + 1).trim();
+      else if (lower.startsWith("calories:") || lower.startsWith("totalcalories:"))
+        calories = line.substring(line.indexOf(":") + 1).trim();
+      else if (lower.startsWith("protein:") || lower.startsWith("totalprotein:"))
+        totalProtein = line.substring(line.indexOf(":") + 1).trim();
+      else if (lower.startsWith("carbs:") || lower.startsWith("totalcarbs:"))
+        totalCarbs = line.substring(line.indexOf(":") + 1).trim();
+      else if (
+        lower.startsWith("fat:") ||
+        lower.startsWith("fats:") ||
+        lower.startsWith("totalfats:")
+      )
+        totalFats = line.substring(line.indexOf(":") + 1).trim();
+    } else if (currentSection === "ingredient" && currentIng) {
+      if (lower.startsWith("name:")) currentIng.name = line.substring(5).trim();
+      else if (lower.startsWith("amount:") || lower.startsWith("quantity:"))
+        currentIng.amount = line.substring(line.indexOf(":") + 1).trim();
+      else if (lower.startsWith("calories:"))
+        currentIng.nutrition.calories = line.substring(9).trim();
+      else if (lower.startsWith("protein:"))
+        currentIng.nutrition.protein = line.substring(8).trim();
+      else if (lower.startsWith("carbs:"))
+        currentIng.nutrition.carbs = line.substring(6).trim();
+      else if (lower.startsWith("fat:") || lower.startsWith("fats:"))
+        currentIng.nutrition.fat = line.substring(line.indexOf(":") + 1).trim();
+      else if (lower.startsWith("desc:") || lower.startsWith("description:"))
+        currentIng.description = line.substring(line.indexOf(":") + 1).trim();
+      else if (lower.startsWith("source:") || lower.startsWith("sourcing:"))
+        currentIng.sourcingAdvantage = line.substring(line.indexOf(":") + 1).trim();
+      else if (!currentIng.name) {
+        currentIng.name = line.replace(/^[-*•\d.]+\s*/, "").trim();
+      }
+    } else if (currentSection === "instructions") {
+      const cleanStep = line.replace(/^[-*•\d.]+\s*/, "").trim();
+      if (cleanStep) instructions.push(cleanStep);
+    }
+  }
+
+  if (currentIng && currentIng.name) {
+    ingredients.push(currentIng);
+  }
+
+  return {
+    title: title || "Recipe",
+    prepTime: prepTime || "20 mins",
+    calories: calories || "350 kcal",
+    totalProtein: totalProtein || "0g",
+    totalCarbs: totalCarbs || "0g",
+    totalFats: totalFats || "0g",
+    ingredients,
+    instructions,
+  };
+}
+
+/**
+ * Parses compact pantry meal text into array of PantryRecipe objects.
+ */
+export function parseCompactPantryMealsText(text: string): any[] {
+  if (!text) throw new Error("Empty AI response received.");
+
+  const trimmed = text.trim();
+
+  // Try JSON parsing first
+  if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+    try {
+      const json = JSON.parse(trimmed);
+      if (Array.isArray(json)) return json;
+      if (json && Array.isArray(json.recipes)) return json.recipes;
+    } catch (e) {}
+  }
+
+  const jsonBlockMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (jsonBlockMatch) {
+    try {
+      const parsed = JSON.parse(jsonBlockMatch[1]);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+  }
+
+  const blocks = trimmed.split(/===RECIPE===/i).filter((b) => b.trim().length > 0);
+  const recipes: any[] = [];
+
+  for (const block of blocks) {
+    try {
+      const recipe = parseCompactRecipeText(block);
+
+      let difficulty: any = "Easy";
+      let matchScore = 85;
+      let tier: any = "Tier 1: Exact";
+      let ingredientsUsed: string[] = [];
+      let missingIngredients: string[] = [];
+      const substitutions: Record<string, string> = {};
+
+      const lines = block.split("\n");
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        const lower = line.toLowerCase();
+        if (lower.startsWith("difficulty:")) difficulty = line.substring(11).trim();
+        else if (lower.startsWith("score:") || lower.startsWith("matchscore:")) {
+          const num = parseInt(line.substring(line.indexOf(":") + 1).replace(/\D/g, ""), 10);
+          if (!isNaN(num)) matchScore = num;
+        } else if (lower.startsWith("tier:")) tier = line.substring(5).trim();
+        else if (lower.startsWith("used:") || lower.startsWith("ingredientsused:")) {
+          ingredientsUsed = line
+            .substring(line.indexOf(":") + 1)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+        } else if (
+          lower.startsWith("missing:") ||
+          lower.startsWith("missingingredients:")
+        ) {
+          missingIngredients = line
+            .substring(line.indexOf(":") + 1)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+        } else if (lower.startsWith("substitutions:")) {
+          const subStr = line.substring(14).trim();
+          subStr.split(",").forEach((pair) => {
+            const parts = pair.split(/->|:/);
+            if (parts.length === 2) {
+              substitutions[parts[0].trim()] = parts[1].trim();
+            }
+          });
+        }
+      }
+
+      recipes.push({
+        ...recipe,
+        difficulty: difficulty || "Easy",
+        matchScore: matchScore || 85,
+        tier: tier || "Tier 1: Exact",
+        ingredientsUsed:
+          ingredientsUsed.length > 0
+            ? ingredientsUsed
+            : recipe.ingredients.map((i: any) => i.name),
+        missingIngredients,
+        substitutions,
+      });
+    } catch (e) {
+      console.warn("[Gemini] Failed to parse pantry recipe block:", e);
+    }
+  }
+
+  return recipes;
+}
+
+/**
+ * Parses compact meal plan text into DailyPlan[] array.
+ */
+export function parseCompactMealPlanText(text: string): any[] {
+  if (!text) throw new Error("Empty AI response received.");
+
+  const trimmed = text.trim();
+
+  if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+    try {
+      const json = JSON.parse(trimmed);
+      if (Array.isArray(json)) return json;
+      if (json && Array.isArray(json.weeklyPlan)) return json.weeklyPlan;
+    } catch (e) {}
+  }
+
+  const jsonBlockMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (jsonBlockMatch) {
+    try {
+      const parsed = JSON.parse(jsonBlockMatch[1]);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+  }
+
+  const dayBlocks = trimmed.split(/===DAY===/i).filter((b) => b.trim().length > 0);
+  const weeklyPlan: any[] = [];
+
+  for (const dayBlock of dayBlocks) {
+    const lines = dayBlock.split("\n");
+    let date = "";
+    let dayName = "";
+
+    for (const line of lines) {
+      const l = line.trim();
+      if (l.toLowerCase().startsWith("date:")) date = l.substring(5).trim();
+      if (
+        l.toLowerCase().startsWith("dayname:") ||
+        l.toLowerCase().startsWith("day:")
+      )
+        dayName = l.substring(l.indexOf(":") + 1).trim();
+    }
+
+    const mealBlocks = dayBlock.split(/---MEAL:\s*/i);
+    const meals: any = { breakfast: null, lunch: null, dinner: null };
+
+    for (const mBlock of mealBlocks) {
+      const mTrimmed = mBlock.trim();
+      const lower = mTrimmed.toLowerCase();
+      let mealType: "breakfast" | "lunch" | "dinner" | null = null;
+      if (lower.startsWith("breakfast")) mealType = "breakfast";
+      else if (lower.startsWith("lunch")) mealType = "lunch";
+      else if (lower.startsWith("dinner")) mealType = "dinner";
+
+      if (mealType) {
+        try {
+          const recipeObj = parseCompactRecipeText(mTrimmed);
+          meals[mealType] = recipeObj;
+        } catch (e) {
+          console.warn(`[Gemini] Failed to parse meal ${mealType}:`, e);
+        }
+      }
+    }
+
+    if (date || dayName || meals.breakfast || meals.lunch || meals.dinner) {
+      weeklyPlan.push({
+        date: date || new Date().toISOString().split("T")[0],
+        dayName: dayName || "Day",
+        meals,
+      });
+    }
+  }
+
+  return weeklyPlan;
+}
+
 // ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Helper to inspect video descriptions for external recipe links and fetch their webpage content.
+ */
+async function fetchLinkFromDescription(descText: string): Promise<string> {
+  if (!descText) return "";
+  const linkMatches = descText.match(/https?:\/\/[^\s"'>]+/gi);
+  if (!linkMatches || linkMatches.length === 0) return "";
+
+  for (const linkUrl of linkMatches) {
+    const lowerLink = linkUrl.toLowerCase();
+    const isSocialOrIgnored =
+      lowerLink.includes("instagram.com") ||
+      lowerLink.includes("tiktok.com") ||
+      lowerLink.includes("youtube.com") ||
+      lowerLink.includes("youtu.be") ||
+      lowerLink.includes("twitter.com") ||
+      lowerLink.includes("facebook.com") ||
+      lowerLink.includes("spotify.com") ||
+      lowerLink.includes("amzn.to") ||
+      lowerLink.includes("amazon.com");
+
+    if (!isSocialOrIgnored) {
+      try {
+        console.log(
+          `[Scraper] Found external link in description: ${linkUrl}. Attempting to fetch recipe page...`,
+        );
+        const extRes = await fetch(linkUrl, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
+        });
+        if (extRes.ok) {
+          const extHtml = await extRes.text();
+          const cleanText = extHtml
+            .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, "")
+            .replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, "")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .substring(0, 35000);
+
+          if (cleanText.length > 200) {
+            console.log(
+              `[Scraper] Successfully extracted content from linked recipe URL (${cleanText.length} chars).`,
+            );
+            return `\n\n[Recipe Content Fetched From Description Link (${linkUrl})]:\n${cleanText}`;
+          }
+        }
+      } catch (err) {
+        console.warn(`[Scraper] External link fetch error for ${linkUrl}:`, err);
+      }
+    }
+  }
+
+  return "";
+}
 
 /**
  * Extracts a recipe based on fetched text data or url.
@@ -236,7 +622,9 @@ export async function extractRecipe(
               .replace(/\\u0026/g, "&");
           }
 
-          // Fetch timedtext transcript if captions are available using ultra-robust multi-fallback direct regex matching
+          // Fetch external link from description if present
+          const externalLinkedRecipe = await fetchLinkFromDescription(decodedDesc);
+
           try {
             let timedTextUrlRaw = "";
             const timedTextMatch1 = html.match(
@@ -263,9 +651,8 @@ export async function extractRecipe(
                 .replace(/\\u003d/g, "=")
                 .replace(/\\u002f/g, "/")
                 .replace(/\\\//g, "/")
-                .replace(/\\/g, ""); // strip any remaining escape slashes
+                .replace(/\\/g, "");
 
-              // Direct auto-translation logic to ensure subtitles fetch in English
               if (
                 !timedTextUrl.includes("lang=en") &&
                 !timedTextUrl.includes("&tlang=en")
@@ -314,8 +701,10 @@ export async function extractRecipe(
             );
           }
 
-          // Combine everything into a powerful prompt payload
           scrapedText = `YouTube Video URL: ${urlOrText}\nVideo Title: ${videoTitle}`;
+          if (externalLinkedRecipe) {
+            scrapedText += externalLinkedRecipe;
+          }
           if (decodedDesc) {
             scrapedText += `\n\n[Written Video Description]:\n${decodedDesc}`;
           }
@@ -350,9 +739,14 @@ export async function extractRecipe(
               .replace(/\\\\/g, "\\");
           }
 
+          const externalLinkedRecipe = await fetchLinkFromDescription(videoDesc);
+
           scrapedText = `TikTok Video URL: ${urlOrText}`;
           if (videoTitle) {
             scrapedText += `\nVideo Title: ${videoTitle}`;
+          }
+          if (externalLinkedRecipe) {
+            scrapedText += externalLinkedRecipe;
           }
           if (videoDesc) {
             scrapedText += `\n\n[Written Video Description / Tags]:\n${videoDesc}`;
@@ -385,9 +779,14 @@ export async function extractRecipe(
               .replace(/\\\\/g, "\\");
           }
 
+          const externalLinkedRecipe = await fetchLinkFromDescription(postDesc);
+
           scrapedText = `Instagram Post URL: ${urlOrText}`;
           if (postTitle) {
             scrapedText += `\nPost Title/Header: ${postTitle}`;
+          }
+          if (externalLinkedRecipe) {
+            scrapedText += externalLinkedRecipe;
           }
           if (postDesc) {
             scrapedText += `\n\n[Post Caption / Recipe Context]:\n${postDesc}`;
@@ -398,7 +797,6 @@ export async function extractRecipe(
           );
         }
 
-        // Extract JSON-LD recipe schema if available in standard recipe blog websites (Google Schema standards)
         if (!scrapedText) {
           try {
             const jsonLdMatches = html.match(
@@ -412,7 +810,6 @@ export async function extractRecipe(
                 try {
                   const jsonObj = JSON.parse(jsonText);
 
-                  // Traverses schemas recursively to find "@type": "Recipe" inside nested Arrays or Graphs
                   const findRecipeSchema = (obj: any): any => {
                     if (!obj) return null;
                     if (obj["@type"] === "Recipe") return obj;
@@ -433,10 +830,6 @@ export async function extractRecipe(
 
                   const recipeSchema = findRecipeSchema(jsonObj);
                   if (recipeSchema) {
-                    console.log(
-                      `[Scraper] Found Google JSON-LD Recipe Schema: "${recipeSchema.name || "Unnamed"}". Extracting structured content...`,
-                    );
-
                     let schemaText = `Structured JSON-LD Recipe Schema Data:\n`;
                     schemaText += `Recipe Name: ${recipeSchema.name || ""}\n`;
                     schemaText += `Prep Time: ${recipeSchema.prepTime || ""}\n`;
@@ -488,9 +881,7 @@ export async function extractRecipe(
                     scrapedText = schemaText;
                     break;
                   }
-                } catch (jsonErr) {
-                  // Skip invalid scripts
-                }
+                } catch (jsonErr) {}
               }
             }
           } catch (ldErr) {
@@ -502,7 +893,6 @@ export async function extractRecipe(
         }
 
         if (!scrapedText) {
-          // Standard HTML tag stripping for regular recipe blogs
           const cleanText = html
             .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, "")
             .replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, "")
@@ -515,7 +905,6 @@ export async function extractRecipe(
         }
 
         const isVideoOrSocialScrape =
-          // Match all structured social profiles or schema formats
           scrapedText.startsWith("YouTube Video URL") ||
           scrapedText.startsWith("TikTok Video URL") ||
           scrapedText.startsWith("Instagram Post URL") ||
@@ -543,54 +932,55 @@ export async function extractRecipe(
     }
   }
 
-  const prompt = `You are a professional, high-end culinary assistant. Extract a recipe based on the provided input data.
-
-CRITICAL EXTRACTION & RECONSTRUCTION RULE:
-1. You MUST first search the provided input data (description details, subtitles transcript, webpage text) to extract ingredients, quantities/amounts, and preparation steps.
-2. If the input data is a URL or text and does not contain a full written recipe (for example, the video description is empty or only has social media links), but you can identify a clear recipe/dish name from the video title, webpage title, or URL keywords, YOU MUST NOT return empty lists or an error. Instead, you MUST use your expert culinary knowledge as a master executive chef to reconstruct a professional, high-end, and mouth-watering recipe for that identified dish. This is a MANDATORY fallback behavior!
-3. Only if there is absolutely no recipe text AND no identifiable recipe/dish title in the inputs, return a JSON object where the "title" is exactly "Error: Valid recipe details could not be extracted from this source" and leave the ingredients and instructions arrays completely empty.
-
-CRITICAL NUTRITIONAL ESTIMATION & ACCURACY RULE:
-- Recipe videos and texts almost never contain specific nutritional details for individual ingredients. You MUST use your extensive internal nutritional knowledge (based on standard USDA food databases and professional dietitian guides) to calculate precise, non-fabricated calories and macronutrients (protein, carbs, fat) based on the specific quantity/amount of each ingredient.
-- DO NOT invent arbitrary numbers or provide false nutritional information. All estimations must be scientifically accurate and logically reasoned (e.g., estimating that 1 large egg contains 70 kcal, 6g protein, 5g fat, 0g carbs; or 1 medium banana contains 105 kcal, 27g carbs, 1.3g protein, 0.4g fat).
-- The total recipe macros (Recipe.calories, Recipe.totalProtein, Recipe.totalCarbs, Recipe.totalFats) MUST be the exact mathematical sum of all the individual ingredients' nutritional values.
+  const prompt = `You are an expert executive chef and culinary dietitian. Extract a complete, non-hallucinated recipe based on the input data.
 
 Input data: ${contextData}
 
-You MUST return a JSON object that adheres EXACTLY to the following typescript schema interface:
+MANDATORY RULES:
+1. EXHAUSTIVE EXTRACTION: You MUST extract 100% of all ingredients, exact quantities/amounts, and chronological cooking steps. Never summarize or omit ingredients.
+2. NO HALLUCINATION: Strictly base ingredients on the provided text, description, transcript, external link, or image. Do NOT invent fake ingredients.
+3. PREPARE TIME & NUTRITION: Calculate exact prep time and USDA-backed calories, protein, carbs, and fat for each ingredient.
+4. EXACT MATHEMATICAL SUM: Total recipe CALORIES, PROTEIN, CARBS, and FAT MUST be the exact mathematical sum of all individual ingredient macros.
+5. NO RECIPE FOUND RULE: If there are NO ingredients or cooking steps present in the input data (link, description, transcript, or image), return:
+TITLE: Error: Valid recipe details could not be extracted from this source
 
-interface Ingredient {
-  name: string; // Keep this distinct, simple, and clean (e.g. "Hass Avocado")
-  amount: string; // The quantity (e.g. "1/2 medium", "2 cups")
-  description: string; // A highly educational, clear 1-2 sentence breakdown explaining exactly how these nutritional metrics were calculated based on the specified quantity/unit using standard USDA databases (e.g. "One medium banana (approx. 118g) contains ~105 kcal, 27g carbohydrates, 1.3g protein, and 0.4g fat based on standard USDA databases. It is an excellent source of potassium and dietary fiber.").
-  nutrition: {
-    calories: string; // Precise estimated calories for this specific ingredient amount, e.g. "120 kcal"
-    protein: string; // Precise estimated protein for this specific ingredient amount, e.g. "2 g"
-    carbs: string; // Precise estimated carbs for this specific ingredient amount, e.g. "8 g"
-    fat: string; // Precise estimated fat for this specific ingredient amount, e.g. "10 g"
-  };
-  sourcingAdvantage: string; // A detailed paragraph (2-3 sentences) highlighting natural health advantages, sourcing tips, and organic benefits of this specific ingredient.
-}
+DO NOT USE JSON FORMAT. Respond using this exact token-efficient compact plain text format:
 
-interface Recipe {
-  title: string; // The appetizing name of the recipe found in the text
-  prepTime: string; 
-  calories: string; // Total calorie count for the entire recipe (must equal the exact sum of all ingredient calories, e.g. "450 kcal")
-  totalProtein: string; // Total protein count for the entire recipe (must equal the exact sum of all ingredient protein, e.g. "35 g")
-  totalCarbs: string; // Total carbs count for the entire recipe (must equal the exact sum of all ingredient carbs, e.g. "28 g")
-  totalFats: string; // Total fats count for the entire recipe (must equal the exact sum of all ingredient fats, e.g. "15 g")
-  ingredients: Ingredient[];
-  instructions: string[]; // Chronological list of cooking steps
-}
+TITLE: [Recipe Title]
+PREP: [Prep/Cook Time, e.g. 20 mins]
+CALORIES: [Total recipe calories, e.g. 450 kcal]
+PROTEIN: [Total recipe protein, e.g. 35g]
+CARBS: [Total recipe carbs, e.g. 28g]
+FAT: [Total recipe fat, e.g. 15g]
 
-Ensure all JSON properties are populated accurately based on the source text if present.`;
+---INGREDIENT---
+NAME: [Ingredient Name]
+AMOUNT: [Quantity/Amount]
+CALORIES: [Estimated calories for this ingredient amount, e.g. 120 kcal]
+PROTEIN: [Protein, e.g. 2g]
+CARBS: [Carbs, e.g. 8g]
+FAT: [Fat, e.g. 10g]
+DESC: [1-2 sentence USDA calculation breakdown]
+SOURCE: [2-3 sentences on health benefits and sourcing]
+
+---INGREDIENT---
+NAME: [Next Ingredient]
+AMOUNT: [Quantity]
+CALORIES: [Calories]
+PROTEIN: [Protein]
+CARBS: [Carbs]
+FAT: [Fat]
+DESC: [Description]
+SOURCE: [Sourcing]
+
+---INSTRUCTIONS---
+1. [First instruction step]
+2. [Second instruction step]
+3. [Third instruction step]`;
 
   try {
-    const result = await callWithRetry(async (modelName) => {
-      const model = genAI!.getGenerativeModel({
-        model: modelName,
-        generationConfig: { responseMimeType: "application/json" },
-      });
+    const rawText = await callWithRetry(async (modelName) => {
+      const model = genAI!.getGenerativeModel({ model: modelName });
       if (imageBase64) {
         return model.generateContent([
           prompt,
@@ -600,28 +990,20 @@ Ensure all JSON properties are populated accurately based on the source text if 
       return model.generateContent(prompt);
     }, prompt);
 
-    // Validate the AI output for extraction security template matching
-    if (
-      result?.title &&
-      (result.title.toLowerCase().includes("error") ||
-        result.title.toLowerCase().includes("could not be extracted"))
-    ) {
-      console.warn(
-        `[Gemini] Security rule triggered: AI returned error signature: "${result.title}"`,
-      );
-      throw new Error(
-        "We successfully reached the source, but could not extract any recipe ingredients or cooking steps.\n\n" +
-          "💡 Pro-tip: Try copying and pasting the raw recipe text directly into the input field instead!",
-      );
-    }
+    const result = parseCompactRecipeText(rawText);
 
-    if (!result?.ingredients || result.ingredients.length === 0) {
-      console.warn(
-        "[Gemini] Security check: Scanned recipe has empty ingredients list.",
-      );
+    // Validate extracted recipe object and throw user error if no recipe returned
+    if (
+      !result ||
+      !result.title ||
+      result.title.toLowerCase().includes("error") ||
+      result.title.toLowerCase().includes("could not be extracted") ||
+      !result.ingredients ||
+      result.ingredients.length === 0
+    ) {
       throw new Error(
-        "We couldn't parse ingredients or instructions from this source.\n\n" +
-          "💡 Pro-tip: Try copying and pasting the recipe text directly instead!",
+        "We reached the source, but could not extract any recipe ingredients or cooking steps.\n\n" +
+          "💡 Pro-tip: Try copying and pasting the raw recipe text directly into the input field instead!",
       );
     }
 
@@ -643,30 +1025,57 @@ export async function mutateRecipe(
   let instructions = "";
   if (mutationType === "healthier") {
     instructions =
-      "Rewrite this recipe dataset to prioritize low-calorie, organic, and highly nutritious alternatives while preserving the identical JSON schema format.";
+      "Rewrite this recipe to prioritize low-calorie, organic, and highly nutritious alternatives.";
   } else if (mutationType === "tastier") {
     instructions =
-      "Rewrite this recipe dataset to elevate taste and flavor profiles while preserving the identical JSON schema format.";
+      "Rewrite this recipe to elevate taste and flavor profiles.";
   } else {
-    instructions = `Modify this recipe dataset according to the following guidelines: ${extraInstructions}. Preserve the identical JSON schema format.`;
+    instructions = `Modify this recipe according to the following guidelines: ${extraInstructions}.`;
   }
 
-  const prompt = `You are a master executive chef and nutrition researcher. You are given this existing recipe JSON object:
-${JSON.stringify(recipe, null, 2)}
+  const prompt = `You are a master chef and culinary dietitian. Here is the existing recipe:
+Title: ${recipe.title}
+Prep Time: ${recipe.prepTime}
+Ingredients: ${recipe.ingredients?.map((i: any) => `${i.amount} ${i.name}`).join(", ")}
+Instructions: ${recipe.instructions?.join(" | ")}
 
-Your task is to:
-${instructions}
+Task: ${instructions}
 
-You MUST return a JSON object with the identical structure containing the updated recipe fields.`;
+RULES:
+1. Extract ALL ingredients and steps without omitting data.
+2. Total calories, protein, carbs, and fat MUST be the exact mathematical sum of individual ingredient values.
+3. Do not hallucinate fake ingredients.
+
+DO NOT USE JSON. Respond in this exact compact plain text format:
+
+TITLE: [Updated Title]
+PREP: [Prep Time]
+CALORIES: [Total Calories]
+PROTEIN: [Total Protein]
+CARBS: [Total Carbs]
+FAT: [Total Fat]
+
+---INGREDIENT---
+NAME: [Name]
+AMOUNT: [Amount]
+CALORIES: [Calories]
+PROTEIN: [Protein]
+CARBS: [Carbs]
+FAT: [Fat]
+DESC: [Description]
+SOURCE: [Sourcing]
+
+---INSTRUCTIONS---
+1. [Step 1]
+2. [Step 2]`;
 
   try {
-    return await callWithRetry(async (modelName) => {
-      const model = genAI!.getGenerativeModel({
-        model: modelName,
-        generationConfig: { responseMimeType: "application/json" },
-      });
+    const rawText = await callWithRetry(async (modelName) => {
+      const model = genAI!.getGenerativeModel({ model: modelName });
       return model.generateContent(prompt);
     }, prompt);
+
+    return parseCompactRecipeText(rawText);
   } catch (error) {
     console.warn("Recipe Mutation Failure:", error);
     throw error;
@@ -677,28 +1086,45 @@ You MUST return a JSON object with the identical structure containing the update
  * Recalculates nutritional values for a recipe based on its edited ingredients.
  */
 export async function recalculateNutrition(recipe: any): Promise<any> {
-  const prompt = `You are a professional dietitian and culinary scientist. You are given a recipe JSON object which has been manually edited by the user.
-Some ingredient amounts or names may have changed, or new ingredients may have been added.
+  const prompt = `You are a professional dietitian. Recalculate nutrition for this edited recipe:
+Title: ${recipe.title}
+Ingredients: ${recipe.ingredients?.map((i: any) => `${i.amount} ${i.name}`).join(", ")}
+Instructions: ${recipe.instructions?.join(" | ")}
 
-Recipe JSON:
-${JSON.stringify(recipe, null, 2)}
+RULES:
+1. Calculate exact USDA-backed calories, protein, carbs, and fat for each ingredient.
+2. Total recipe calories, protein, carbs, and fat MUST equal the exact mathematical sum of all ingredient values.
+3. Keep instructions exactly as they are.
 
-Your task is to:
-1. Re-analyze the ingredients list and estimate highly accurate, scientifically sound calories and macronutrients (protein, carbs, fat) for each ingredient based on its specified name and quantity/amount.
-2. Update the "nutrition" field (calories, protein, carbs, fat) and "sourcingAdvantage" field for each ingredient in the array.
-3. Calculate the new total calories, totalProtein, totalCarbs, and totalFats for the entire recipe, which MUST equal the exact mathematical sum of all the individual ingredients' nutritional values.
-4. Keep the same title, ingredients name/amount, and instructions exactly as they are. Do not change the text of instructions or ingredients. Only calculate and update the nutrition numbers and description/sourcingAdvantage where necessary.
+DO NOT USE JSON. Respond in this exact compact plain text format:
 
-You MUST return a JSON object with the identical structure containing the updated recipe fields, satisfying the Recipe interface structure.`;
+TITLE: ${recipe.title}
+PREP: ${recipe.prepTime || "20 mins"}
+CALORIES: [Total sum calories]
+PROTEIN: [Total sum protein]
+CARBS: [Total sum carbs]
+FAT: [Total sum fat]
+
+---INGREDIENT---
+NAME: [Ingredient Name]
+AMOUNT: [Amount]
+CALORIES: [Ingredient Calories]
+PROTEIN: [Protein]
+CARBS: [Carbs]
+FAT: [Fat]
+DESC: [Calculation breakdown]
+SOURCE: [Health benefits]
+
+---INSTRUCTIONS---
+${recipe.instructions?.map((inst: string, i: number) => `${i + 1}. ${inst}`).join("\n")}`;
 
   try {
-    return await callWithRetry(async (modelName) => {
-      const model = genAI!.getGenerativeModel({
-        model: modelName,
-        generationConfig: { responseMimeType: "application/json" },
-      });
+    const rawText = await callWithRetry(async (modelName) => {
+      const model = genAI!.getGenerativeModel({ model: modelName });
       return model.generateContent(prompt);
     }, prompt);
+
+    return parseCompactRecipeText(rawText);
   } catch (error) {
     console.warn("Recipe Nutrition Recalculation Failure:", error);
     throw error;
@@ -709,61 +1135,36 @@ You MUST return a JSON object with the identical structure containing the update
 export function getProfileSystemPrompt(profile: any): string {
   if (!profile) return "";
 
-  let rules = "\n\nCRITICAL PROFILE & DIETARY CONSTRAINT RULES:\n";
+  let rules = "\n\nDIETARY & PROFILE CONSTRAINTS:\n";
 
-  // Hard constraints
   if (profile.dietary === "halal") {
-    rules +=
-      "- STRICT REQUIREMENT: The recipe must be 100% Halal. Under NO circumstances should pork, lard, gelatin, or alcohol (including cooking wine, sake, mirin, rum, beer, etc.) be suggested or included as ingredients.\n";
+    rules += "- Halal only. No pork, lard, gelatin, or alcohol.\n";
   } else if (profile.dietary === "vegetarian") {
-    rules +=
-      "- STRICT REQUIREMENT: The recipe must be Vegetarian. Under NO circumstances should any meat, poultry, fish, seafood, or animal-derived rennet/gelatin be included.\n";
+    rules += "- Vegetarian only. No meat, poultry, fish, or seafood.\n";
   } else if (profile.dietary === "vegan") {
-    rules +=
-      "- STRICT REQUIREMENT: The recipe must be 100% Vegan. Under NO circumstances should meat, poultry, fish, seafood, dairy, eggs, honey, or any animal-derived product be included.\n";
+    rules += "- 100% Vegan only. No animal products or dairy.\n";
   }
 
   if (profile.allergies && profile.allergies.length > 0) {
     profile.allergies.forEach((allergy: string) => {
-      rules += `- STRICT REQUIREMENT: Avoid any ingredients containing ${allergy.trim().toLowerCase()}. Do not suggest or include ${allergy.trim().toLowerCase()} in any ingredients.\n`;
+      rules += `- NO ${allergy.trim().toUpperCase()}.\n`;
     });
   }
 
-  // Soft constraints
-  if (
-    profile.culture &&
-    profile.culture !== "none" &&
-    profile.culture !== "none"
-  ) {
-    rules += `- CUISINE PREFERENCE: Prioritize flavor profiles, techniques, and traditional style from ${profile.culture} cuisine.\n`;
+  if (profile.culture && profile.culture !== "none") {
+    rules += `- Prefer ${profile.culture} cuisine style.\n`;
   }
 
   if (profile.spicyLevel !== undefined) {
-    rules += `- SPICE LEVEL PREFERENCE: Adjust the recipe spices to fit a level of ${profile.spicyLevel} out of 5 (where 1 is mild, 3 is medium, 5 is extremely spicy).\n`;
+    rules += `- Spice level: ${profile.spicyLevel}/5.\n`;
   }
 
   if (profile.budgetLevel && profile.budgetLevel !== "none") {
-    rules += `- BUDGET CONSTRAINT: Target ingredients that fit a ${profile.budgetLevel} budget level.\n`;
+    rules += `- Budget target: ${profile.budgetLevel}.\n`;
   }
 
   if (profile.cookingSkill) {
-    rules += `- SKILL LEVEL TARGET: Design recipes suitable for a chef with ${profile.cookingSkill} cooking skill.\n`;
-  }
-
-  // Health goals
-  if (profile.healthGoals && profile.healthGoals.length > 0) {
-    rules += "- HEALTH & DIETARY GOALS:\n";
-    profile.healthGoals.forEach((goal: string) => {
-      if (goal === "weightLoss") {
-        rules += "  * Target calorie-conscious, nutrient-dense ingredients supporting weight loss.\n";
-      } else if (goal === "highProtein") {
-        rules += "  * Prioritize high-protein ingredients (lean meats, poultry, fish, eggs, tofu, legumes, dairy, etc.) to support protein-focused intake.\n";
-      } else if (goal === "balancedDiet") {
-        rules += "  * Maintain a balanced macronutrient ratio (moderate protein, complex carbs, healthy fats).\n";
-      } else if (goal === "lowCarb") {
-        rules += "  * Prioritize low-carbohydrate ingredients, avoiding or minimizing sugar and refined starches (like white rice, white flour, pasta).\n";
-      }
-    });
+    rules += `- Skill target: ${profile.cookingSkill}.\n`;
   }
 
   return rules;
@@ -775,57 +1176,53 @@ export async function generatePantryMeals(
   options: { timeLimit?: string; skillLevel?: string; profile: any },
 ): Promise<any[]> {
   const profileRules = getProfileSystemPrompt(options.profile);
-  const prompt = `You are a professional culinary chef. Given the user's pantry ingredients: ${pantryIngredients.join(", ")}.
+  const prompt = `You are a professional chef. Given user pantry ingredients: ${pantryIngredients.join(", ")}.
 Suggest 3 to 5 meal options.
-Options must be structured into one of three Tiers:
-- Tier 1: Exact Match (User has 100% or almost 100% of the core ingredients needed).
-- Tier 2: Near Match (User is missing 1 to 3 items. Highlight missing items and recommend smart substitutions).
-- Tier 3: Creative Match (Uses some pantry items and suggests a creative recipe).
-
-Additional User Constraints:
-- Prep/Cook Time Limit: ${options.timeLimit || "Any"}
-- Skill level override: ${options.skillLevel || options.profile?.cookingSkill || "Any"}
 ${profileRules}
+Time limit: ${options.timeLimit || "Any"}
 
-CRITICAL INGREDIENT REQUIREMENT: 
-You MUST provide an EXHAUSTIVE and COMPLETE list of every single ingredient required to cook the meal. This includes all core ingredients, oils, spices (e.g., salt, pepper, masala, herbs), garnishes, and liquids. Do not hallucinate ingredients or fabricate imaginary items, but ensure absolutely no necessary cooking component is omitted. All quantities must be scientifically accurate.
+RULES:
+1. Provide an exhaustive list of every single ingredient required.
+2. Do not hallucinate fake ingredients.
+3. Total calories, protein, carbs, and fat MUST be the exact mathematical sum of individual ingredient values.
 
-You MUST return a JSON array of recipe objects matching the following JSON interface structure:
-interface Ingredient {
-  name: string;
-  amount: string;
-  description: string;
-  nutrition: { calories: string; protein: string; carbs: string; fat: string; };
-  sourcingAdvantage: string;
-}
-interface PantryRecipe {
-  title: string; // appetizing recipe title
-  prepTime: string; // prep/cook time, e.g. "25 mins"
-  difficulty: "Beginner" | "Intermediate" | "Advanced";
-  matchScore: number; // percentage match from 0 to 100
-  tier: "Tier 1: Exact" | "Tier 2: Near" | "Tier 3: Creative";
-  ingredientsUsed: string[]; // list of pantry ingredients used in this recipe
-  missingIngredients: string[]; // list of ingredients missing that the user needs to get
-  substitutions: Record<string, string>; // mapping of missing ingredient to alternative suggestion (e.g. {"heavy cream": "coconut milk"})
-  calories: string; // e.g. "350 kcal, do not say Aprrox give only exact value like 35g"
-  totalProtein: string; // e.g. "35g, do not say Aprrox give only exact value like 35g"
-  totalCarbs: string; // e.g. "35g, do not say Aprrox give only exact value like 35g"
-  totalFats: string; // e.g. "35g, do not say Aprrox give only exact value like 35g"
-  ingredients: Ingredient[];
-  instructions: string[]; // cooking steps
-}
+DO NOT USE JSON FORMAT. Respond in this exact compact plain text format for each recipe:
 
-Ensure the output is a valid JSON array only.`;
+===RECIPE===
+TITLE: [Recipe Title]
+PREP: [25 mins]
+DIFFICULTY: [Beginner/Intermediate/Advanced]
+SCORE: [Match percentage 0-100]
+TIER: [Tier 1: Exact / Tier 2: Near / Tier 3: Creative]
+USED: [Pantry items used, comma separated]
+MISSING: [Missing items, comma separated]
+SUBSTITUTIONS: [Missing1 -> Alt1, Missing2 -> Alt2]
+CALORIES: [350 kcal]
+PROTEIN: [35g]
+CARBS: [25g]
+FAT: [12g]
+
+---INGREDIENT---
+NAME: [Name]
+AMOUNT: [Amount]
+CALORIES: [120 kcal]
+PROTEIN: [5g]
+CARBS: [10g]
+FAT: [2g]
+DESC: [Description]
+SOURCE: [Sourcing]
+
+---INSTRUCTIONS---
+1. [Step 1]
+2. [Step 2]`;
 
   try {
-    const result = await callWithRetry(async (modelName) => {
-      const model = genAI!.getGenerativeModel({
-        model: modelName,
-        generationConfig: { responseMimeType: "application/json" },
-      });
+    const rawText = await callWithRetry(async (modelName) => {
+      const model = genAI!.getGenerativeModel({ model: modelName });
       return model.generateContent(prompt);
     }, prompt);
-    return result;
+
+    return parseCompactPantryMealsText(rawText);
   } catch (error) {
     console.error("generatePantryMeals error:", error);
     throw error;
@@ -843,15 +1240,6 @@ export async function generateMealPlan(
   },
 ): Promise<any[]> {
   const profileRules = getProfileSystemPrompt(options.profile);
-  const pantryContext =
-    options.pantryEnabled && options.pantryList.length > 0
-      ? `The user has these ingredients in their pantry: ${options.pantryList.join(", ")}. Prioritize suggestions that utilize these ingredients to save money.`
-      : "No pantry constraints.";
-
-  const historyContext =
-    options.pastMeals.length > 0
-      ? `Avoid suggesting the following meals to prevent repetition: ${options.pastMeals.join(", ")}.`
-      : "";
 
   const today = new Date();
   const datesList = [];
@@ -872,58 +1260,89 @@ export async function generateMealPlan(
     datesList.push({ date: dateStr, dayName });
   }
 
-  const prompt = `You are a master dietitian. Generate a healthy, customized meal plan for the next ${daysCount} days.
-Dates to schedule:
+  const prompt = `You are a master dietitian. Generate a meal plan for ${daysCount} days:
 ${datesList.map((item) => `- ${item.date} (${item.dayName})`).join("\n")}
-
-User Context & Constraints:
-${pantryContext}
-${historyContext}
 ${profileRules}
 
-CRITICAL INGREDIENT REQUIREMENT: 
-You MUST provide an EXHAUSTIVE and COMPLETE list of every single ingredient required to cook each meal. This includes all core ingredients, oils, spices (e.g., salt, pepper, masala, herbs), garnishes, and liquids. Do not hallucinate ingredients or fabricate imaginary items, but ensure absolutely no necessary cooking component is omitted. All quantities must be scientifically accurate.
+RULES:
+1. Provide exhaustive ingredients and steps for every meal.
+2. Total calories, protein, carbs, and fat MUST be the exact mathematical sum of individual ingredient values.
+3. Do not hallucinate fake ingredients.
 
-You MUST return a JSON array matching exactly this TypeScript schema:
-interface Ingredient {
-  name: string;
-  amount: string;
-  description: string;
-  nutrition: { calories: string; protein: string; carbs: string; fat: string; };
-  sourcingAdvantage: string;
-}
-interface MealItem {
-  title: string;
-  prepTime: string;
-  calories: string;
-  totalProtein: string;
-  totalCarbs: string;
-  totalFats: string;
-  ingredients: Ingredient[];
-  instructions: string[];
-}
-interface DailyPlan {
-  date: string; // e.g. "2026-06-15"
-  dayName: string; // e.g. "Monday"
-  meals: {
-    breakfast: MealItem;
-    lunch: MealItem;
-    dinner: MealItem;
-  };
-}
-type MealPlan = DailyPlan[];
+DO NOT USE JSON FORMAT. Respond in this exact compact plain text format:
 
-Return only a valid JSON array matching the type MealPlan.`;
+${datesList
+  .map(
+    (item) => `===DAY===
+DATE: ${item.date}
+DAYNAME: ${item.dayName}
+
+---MEAL: breakfast---
+TITLE: [Breakfast Title]
+PREP: [15 mins]
+CALORIES: [350 kcal]
+PROTEIN: [20g]
+CARBS: [35g]
+FAT: [10g]
+---INGREDIENT---
+NAME: [Ingredient]
+AMOUNT: [Amount]
+CALORIES: [Calories]
+PROTEIN: [Protein]
+CARBS: [Carbs]
+FAT: [Fat]
+DESC: [Desc]
+SOURCE: [Source]
+---INSTRUCTIONS---
+1. [Step 1]
+
+---MEAL: lunch---
+TITLE: [Lunch Title]
+PREP: [20 mins]
+CALORIES: [450 kcal]
+PROTEIN: [30g]
+CARBS: [40g]
+FAT: [15g]
+---INGREDIENT---
+NAME: [Ingredient]
+AMOUNT: [Amount]
+CALORIES: [Calories]
+PROTEIN: [Protein]
+CARBS: [Carbs]
+FAT: [Fat]
+DESC: [Desc]
+SOURCE: [Source]
+---INSTRUCTIONS---
+1. [Step 1]
+
+---MEAL: dinner---
+TITLE: [Dinner Title]
+PREP: [25 mins]
+CALORIES: [550 kcal]
+PROTEIN: [40g]
+CARBS: [45g]
+FAT: [18g]
+---INGREDIENT---
+NAME: [Ingredient]
+AMOUNT: [Amount]
+CALORIES: [Calories]
+PROTEIN: [Protein]
+CARBS: [Carbs]
+FAT: [Fat]
+DESC: [Desc]
+SOURCE: [Source]
+---INSTRUCTIONS---
+1. [Step 1]`,
+  )
+  .join("\n\n")}`;
 
   try {
-    const result = await callWithRetry(async (modelName) => {
-      const model = genAI!.getGenerativeModel({
-        model: modelName,
-        generationConfig: { responseMimeType: "application/json" },
-      });
+    const rawText = await callWithRetry(async (modelName) => {
+      const model = genAI!.getGenerativeModel({ model: modelName });
       return model.generateContent(prompt);
     }, prompt);
-    return result;
+
+    return parseCompactMealPlanText(rawText);
   } catch (error) {
     console.error("generateMealPlan error:", error);
     throw error;
@@ -938,47 +1357,45 @@ export async function regenerateMealItem(
   options: { pantryList: string[]; profile: any; pastMeals: string[] },
 ): Promise<any> {
   const profileRules = getProfileSystemPrompt(options.profile);
-  const pantryContext =
-    options.pantryList.length > 0
-      ? `User pantry: ${options.pantryList.join(", ")}.`
-      : "";
 
-  const historyContext =
-    options.pastMeals.length > 0
-      ? `Avoid repeating: ${options.pastMeals.join(", ")}.`
-      : "";
-
-  const prompt = `You are a master dietitian. The user wants to replace their ${mealType} meal for ${dayName} (${date}).
-Provide a new healthy meal alternative matching their constraints.
-
-Constraints:
-${pantryContext}
-${historyContext}
+  const prompt = `Suggest a replacement ${mealType} meal for ${dayName} (${date}).
 ${profileRules}
 
-You MUST return a JSON object matching this schema:
-interface MealItem {
-  title: string;
-  prepTime: string;
-  calories: string;
-  totalProtein: string;
-  totalCarbs: string;
-  totalFats: string;
-  ingredients: { name: string; amount: string }[];
-  instructions: string[];
-}
+RULES:
+1. Provide exhaustive ingredients and steps.
+2. Total calories, protein, carbs, and fat MUST be the exact mathematical sum of individual ingredient values.
+3. Do not hallucinate fake ingredients.
 
-Return only a valid JSON object matching the MealItem interface.`;
+DO NOT USE JSON FORMAT. Respond in this exact compact plain text format:
+
+TITLE: [Meal Title]
+PREP: [15 mins]
+CALORIES: [400 kcal]
+PROTEIN: [25g]
+CARBS: [35g]
+FAT: [12g]
+
+---INGREDIENT---
+NAME: [Ingredient Name]
+AMOUNT: [Amount]
+CALORIES: [Calories]
+PROTEIN: [Protein]
+CARBS: [Carbs]
+FAT: [Fat]
+DESC: [Desc]
+SOURCE: [Source]
+
+---INSTRUCTIONS---
+1. [Step 1]
+2. [Step 2]`;
 
   try {
-    const result = await callWithRetry(async (modelName) => {
-      const model = genAI!.getGenerativeModel({
-        model: modelName,
-        generationConfig: { responseMimeType: "application/json" },
-      });
+    const rawText = await callWithRetry(async (modelName) => {
+      const model = genAI!.getGenerativeModel({ model: modelName });
       return model.generateContent(prompt);
     }, prompt);
-    return result;
+
+    return parseCompactRecipeText(rawText);
   } catch (error) {
     console.error("regenerateMealItem error:", error);
     throw error;

@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  FlatList,
   ActivityIndicator,
   Modal,
 } from "react-native";
@@ -16,16 +15,16 @@ import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { RootState } from "@/store";
-import { ThemeColors, ThemeGradients } from "@/theme/colors";
+import { ThemeColors, Typography, Spacing, Radius } from "@/theme/colors";
 import { CardContainer } from "@/components/CardContainer";
 import { ActionButton } from "@/components/ActionButton";
 import { CustomAlert } from "@/components/CustomAlert";
+import { TabHeader } from "@/components/TabHeader";
 import { setRecentMatches } from "@/store/pantrySlice";
 import { generatePantryMeals } from "@/services/gemini";
 import { setActiveRecipe } from "@/store/recipeSlice";
 import { checkMonthRollover, incrementFreeScan } from "@/store/subscriptionSlice";
 import { useNetInfo } from "@react-native-community/netinfo";
-import { TabHeader } from "@/components/TabHeader";
 
 const POPULAR_SUGGESTIONS = ["chicken", "tomato", "eggs", "garlic", "onion", "cheese", "pasta", "milk", "butter", "beef"];
 
@@ -140,45 +139,76 @@ export default function PantryScreen() {
     }
   };
 
+  const FilterChip = ({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) => (
+    <TouchableOpacity
+      style={[
+        styles.filterChip,
+        {
+          backgroundColor: selected ? colors.primaryAccent : colors.surface,
+          borderColor: selected ? colors.primaryAccent : colors.border,
+        },
+      ]}
+      onPress={onPress}
+    >
+      <Text
+        style={[
+          Typography.chipText,
+          {
+            color: selected ? "#FFFFFF" : colors.textPrimary,
+            textTransform: "capitalize",
+          },
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }} edges={["top"]}>
       <TabHeader title="What can I cook?" subtitle="MATCH INGREDIENTS" />
       <ScrollView
-        style={[styles.container, { backgroundColor: "transparent" }]}
+        style={{ flex: 1, backgroundColor: "transparent" }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={[styles.descriptionText, { color: colors.textSecondary }]}>
-          Input whatever ingredients you currently own, and our culinary AI will output tailored recipe matches.
+        <Text style={[Typography.body, { color: colors.textSecondary, marginBottom: Spacing.xl }]}>
+          Add your available ingredients and we'll find recipes you can make right now.
         </Text>
 
-        {/* Input area */}
-        <CardContainer gradient={ThemeGradients.cardCyan} style={styles.inputCard}>
-          <Text style={[styles.label, { color: "rgba(28, 25, 23, 0.7)" }]}>Add Ingredient</Text>
+        {/* Input Area */}
+        <CardContainer style={styles.inputCard}>
+          <Text style={[Typography.overline, { color: colors.textTertiary, marginBottom: Spacing.sm }]}>
+            ADD INGREDIENT
+          </Text>
           <View style={styles.inputRow}>
-            <TextInput
-              style={[
-                styles.textInput,
-                { backgroundColor: "rgba(255,255,255,0.2)", borderColor: "rgba(28, 25, 23, 0.1)", color: "#1C1917" },
-              ]}
-              placeholder="e.g. Chicken 1kg, 3 Eggs, Lemon"
-              placeholderTextColor="rgba(28, 25, 23, 0.5)"
-              value={inputVal}
-              onChangeText={setInputVal}
-              onSubmitEditing={() => handleAddIngredient(inputVal)}
-              autoCapitalize="none"
-            />
+            <View style={[
+              styles.textInputWrap,
+              { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderLight },
+            ]}>
+              <TextInput
+                style={[styles.textInput, { color: colors.textPrimary }]}
+                placeholder="e.g. Chicken, Eggs, Lemon..."
+                placeholderTextColor={colors.textTertiary}
+                value={inputVal}
+                onChangeText={setInputVal}
+                onSubmitEditing={() => handleAddIngredient(inputVal)}
+                autoCapitalize="none"
+              />
+            </View>
             <TouchableOpacity
-              style={[styles.addBtn, { backgroundColor: "#1C1917" }]}
+              style={[styles.addBtn, { backgroundColor: colors.primaryAccent }]}
               onPress={() => handleAddIngredient(inputVal)}
             >
               <Ionicons name="add" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
-          {/* Quick recommendations */}
-          <Text style={[styles.hintLabel, { color: "rgba(28, 25, 23, 0.7)" }]}>POPULAR QUICK ADD</Text>
+          {/* Quick Suggestions */}
+          <Text style={[Typography.overline, { color: colors.textTertiary, marginTop: Spacing.lg, marginBottom: Spacing.sm }]}>
+            QUICK ADD
+          </Text>
           <View style={styles.suggestionRow}>
             {POPULAR_SUGGESTIONS.map((item) => {
               const alreadyHas = pantryList.includes(item);
@@ -186,33 +216,33 @@ export default function PantryScreen() {
               return (
                 <TouchableOpacity
                   key={item}
-                  style={[styles.suggestionChip, { borderColor: "rgba(28, 25, 23, 0.1)", backgroundColor: "rgba(255,255,255,0.2)" }]}
+                  style={[styles.suggestionChip, { borderColor: colors.border, backgroundColor: colors.surface }]}
                   onPress={() => handleAddIngredient(item)}
                 >
-                  <Text style={[styles.suggestionText, { color: "#1C1917" }]}>+ {item}</Text>
+                  <Text style={[Typography.chipText, { color: colors.textPrimary }]}>+ {item}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
         </CardContainer>
 
-        {/* Tags display */}
+        {/* Tags Display */}
         {pantryList.length > 0 && (
-          <CardContainer style={styles.tagsCard}>
+          <CardContainer style={{ marginTop: Spacing.md }}>
             <View style={styles.tagsHeader}>
-              <Text style={[styles.tagsCount, { color: colors.textPrimary }]}>
-                My Ingredients ({pantryList.length} items)
+              <Text style={[Typography.label, { color: colors.textPrimary }]}>
+                My Ingredients ({pantryList.length})
               </Text>
               <TouchableOpacity onPress={handleClearPantry}>
-                <Text style={{ color: "#EA4335", fontWeight: "bold" }}>Clear All</Text>
+                <Text style={[Typography.label, { color: colors.errorRed }]}>Clear All</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.tagsGrid}>
               {pantryList.map((item) => (
-                <View key={item} style={[styles.tagPill, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <Text style={[styles.tagText, { color: colors.textPrimary }]}>{item}</Text>
+                <View key={item} style={[styles.tagPill, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderLight }]}>
+                  <Text style={[Typography.chipText, { color: colors.textPrimary }]}>{item}</Text>
                   <TouchableOpacity onPress={() => handleRemoveIngredient(item)}>
-                    <Ionicons name="close-circle" size={18} color={colors.textSecondary} style={{ marginLeft: 6 }} />
+                    <Ionicons name="close-circle" size={16} color={colors.textTertiary} style={{ marginLeft: 6 }} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -220,76 +250,61 @@ export default function PantryScreen() {
           </CardContainer>
         )}
 
-        {/* Extra constraints selectors */}
-        <CardContainer style={styles.filtersCard}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>Matching Filters</Text>
+        {/* Filters */}
+        <CardContainer style={{ marginTop: Spacing.md }}>
+          <Text style={[Typography.overline, { color: colors.textTertiary, marginBottom: Spacing.md }]}>
+            MATCHING FILTERS
+          </Text>
 
-          <View style={styles.filterGroup}>
-            <Text style={[styles.filterLabel, { color: colors.textPrimary }]}>Prep Time Limit</Text>
-            <View style={styles.filterOptions}>
-              {["any", "15 mins", "30 mins", "60 mins"].map((t) => (
-                <TouchableOpacity
-                  key={t}
-                  style={[
-                    styles.filterChip,
-                    {
-                      backgroundColor: timeLimit === t ? colors.primaryAccent : colors.background,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => setTimeLimit(t)}
-                >
-                  <Text style={{ color: timeLimit === t ? colors.background : colors.textPrimary, fontSize: 12 }}>
-                    {t === "any" ? "Any" : t}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+          <Text style={[Typography.label, { color: colors.textPrimary, marginBottom: Spacing.sm }]}>Prep Time</Text>
+          <View style={styles.filterOptions}>
+            {["any", "15 mins", "30 mins", "60 mins"].map((t) => (
+              <FilterChip
+                key={t}
+                label={t === "any" ? "Any" : t}
+                selected={timeLimit === t}
+                onPress={() => setTimeLimit(t)}
+              />
+            ))}
           </View>
 
-          <View style={[styles.filterGroup, { marginTop: 12 }]}>
-            <Text style={[styles.filterLabel, { color: colors.textPrimary }]}>Chef Skill Level</Text>
-            <View style={styles.filterOptions}>
-              {["any", "beginner", "intermediate", "advanced"].map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[
-                    styles.filterChip,
-                    {
-                      backgroundColor: skillLevel === s ? colors.primaryAccent : colors.background,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => setSkillLevel(s)}
-                >
-                  <Text
-                    style={{
-                      color: skillLevel === s ? colors.background : colors.textPrimary,
-                      fontSize: 12,
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    {s === "any" ? "Any" : s}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+          <Text style={[Typography.label, { color: colors.textPrimary, marginTop: Spacing.lg, marginBottom: Spacing.sm }]}>
+            Skill Level
+          </Text>
+          <View style={styles.filterOptions}>
+            {["any", "beginner", "intermediate", "advanced"].map((s) => (
+              <FilterChip
+                key={s}
+                label={s === "any" ? "Any" : s}
+                selected={skillLevel === s}
+                onPress={() => setSkillLevel(s)}
+              />
+            ))}
           </View>
         </CardContainer>
 
         {/* Action Button */}
-        <ActionButton title="What can I cook?" onPress={handleTriggerAI} style={styles.actionBtn} />
+        <ActionButton
+          title="What can I cook?"
+          icon="sparkles-outline"
+          onPress={handleTriggerAI}
+          style={{ marginTop: Spacing.xl }}
+        />
 
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Loading overlay modal */}
+      {/* Loading Overlay */}
       <Modal visible={loading} transparent animationType="fade">
         <View style={styles.overlayBackground}>
           <View style={[styles.overlayContent, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <ActivityIndicator size="large" color={colors.primaryAccent} />
-            <Text style={[styles.overlayTitle, { color: colors.textPrimary }]}>Culinary matching engine...</Text>
-            <Text style={[styles.overlayStep, { color: colors.textSecondary }]}>{loadingStep}</Text>
+            <Text style={[Typography.cardTitle, { color: colors.textPrimary, marginTop: Spacing.lg }]}>
+              Finding recipes...
+            </Text>
+            <Text style={[Typography.caption, { color: colors.textSecondary, marginTop: Spacing.xs }]}>
+              {loadingStep}
+            </Text>
           </View>
         </View>
       </Modal>
@@ -307,220 +322,89 @@ export default function PantryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   scrollContent: {
-    padding: 20,
-  },
-  descriptionText: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 20,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.sm,
   },
   inputCard: {
-    padding: 16,
-    borderRadius: 24,
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 8,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
   },
   inputRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: Spacing.sm,
   },
-  textInput: {
+  textInputWrap: {
     flex: 1,
     height: 48,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    borderRadius: Radius.md,
+    justifyContent: "center",
+    paddingHorizontal: Spacing.lg,
+  },
+  textInput: {
     fontSize: 15,
+    height: "100%",
   },
   addBtn: {
     width: 48,
     height: 48,
-    borderRadius: 12,
+    borderRadius: Radius.md,
     alignItems: "center",
     justifyContent: "center",
-  },
-  hintLabel: {
-    fontSize: 9,
-    fontWeight: "800",
-    marginTop: 16,
-    letterSpacing: 0.8,
-    marginBottom: 8,
   },
   suggestionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
+    gap: Spacing.sm,
   },
   suggestionChip: {
-    paddingHorizontal: 10,
+    paddingHorizontal: Spacing.md,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: Radius.pill,
     borderWidth: 1,
-  },
-  suggestionText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  tagsCard: {
-    padding: 16,
-    borderRadius: 24,
-    marginTop: 16,
   },
   tagsHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
-  },
-  tagsCount: {
-    fontSize: 14,
-    fontWeight: "700",
+    marginBottom: Spacing.md,
   },
   tagsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: Spacing.sm,
   },
   tagPill: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: Spacing.md,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: Radius.pill,
     borderWidth: 1,
-  },
-  tagText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  filtersCard: {
-    padding: 16,
-    borderRadius: 24,
-    marginTop: 16,
-  },
-  filterGroup: {},
-  filterLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    marginBottom: 6,
   },
   filterOptions: {
     flexDirection: "row",
-    gap: 6,
+    flexWrap: "wrap",
+    gap: Spacing.sm,
   },
   filterChip: {
-    paddingHorizontal: 10,
+    paddingHorizontal: Spacing.md,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: Radius.pill,
     borderWidth: 1,
-  },
-  actionBtn: {
-    marginTop: 20,
-    height: 54,
-  },
-  resultsWrapper: {
-    marginTop: 24,
-  },
-  tierSection: {
-    marginBottom: 20,
-  },
-  tierSectionTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    marginBottom: 12,
-  },
-  recipeCard: {
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1.5,
-  },
-  cardHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 10,
-  },
-  recipeTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    flex: 1,
-  },
-  matchScoreBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  matchScoreVal: {
-    fontSize: 11,
-    fontWeight: "800",
-  },
-  metaRow: {
-    flexDirection: "row",
-    gap: 16,
-    marginTop: 8,
-  },
-  metaCol: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  missingContainer: {
-    flexDirection: "row",
-    marginTop: 10,
-    flexWrap: "wrap",
-  },
-  missingLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  missingItems: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  substitutionsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 8,
-  },
-  subtextText: {
-    fontSize: 12,
-    fontWeight: "500",
   },
   overlayBackground: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
   overlayContent: {
-    padding: 24,
-    borderRadius: 16,
+    padding: Spacing.xxl,
+    borderRadius: Radius.xl,
     borderWidth: 1,
     alignItems: "center",
     width: "75%",
-  },
-  overlayTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    marginTop: 16,
-  },
-  overlayStep: {
-    fontSize: 13,
-    marginTop: 6,
-    textAlign: "center",
   },
 });

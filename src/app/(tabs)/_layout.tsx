@@ -22,11 +22,10 @@ export default function TabLayout() {
 
   return (
     <NativeTabs
-      // The user wants a static background color. We use the deep Slate/Ocean background.
       backgroundColor={colors.background}
-      indicatorColor={isIOS ? undefined : (mode === 'light' ? `${colors.primaryAccent}26` : `${colors.primaryAccent}4D`)}
+      indicatorColor={isIOS ? undefined : `${colors.primaryAccent}26`}
       tintColor={colors.primaryAccent}
-      rippleColor={isIOS ? undefined : (mode === 'light' ? `${colors.primaryAccent}1A` : `${colors.primaryAccent}33`)}
+      rippleColor={isIOS ? undefined : `${colors.primaryAccent}1A`}
       
       // Keep key bound to mode to force smooth UI re-renders
       key={mode} 
@@ -38,7 +37,7 @@ export default function TabLayout() {
           fontWeight: '700',
         },
         default: { 
-          color: colors.textSecondary,
+          color: colors.textTertiary,
           fontSize: 10,
           fontWeight: '500',
         }

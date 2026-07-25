@@ -193,7 +193,11 @@ function RootLayoutNav() {
       apiKey !== "appl_api_key_placeholder" &&
       apiKey !== "goog_api_key_placeholder"
     ) {
-      Purchases.configure({ apiKey });
+      try {
+        Purchases.configure({ apiKey });
+      } catch (e) {
+        console.warn("RevenueCat Purchases configure error:", e);
+      }
     }
   }, []);
 

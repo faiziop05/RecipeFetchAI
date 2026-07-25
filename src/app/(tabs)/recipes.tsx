@@ -882,7 +882,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 14,
     borderRadius: 24,
   },
   cardInfoContainer: {
@@ -934,6 +934,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     position: "relative",
     justifyContent: "space-between",
+    marginBottom: 14,
   },
   gridCardContent: {
     flex: 1,

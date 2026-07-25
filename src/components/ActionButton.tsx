@@ -1,17 +1,22 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle, View } from 'react-native';
 import { useSelector } from 'react-redux';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { RootState } from '@/store';
-import { ThemeColors } from '@/theme/colors';
+import { ThemeColors, Typography, Radius, Spacing } from '@/theme/colors';
 
 interface ActionButtonProps {
   title: string;
   onPress: () => void;
   loading?: boolean;
-  variant?: 'primary' | 'secondary' | 'outline' | 'danger';
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost';
+  size?: 'large' | 'medium' | 'small';
+  icon?: keyof typeof Ionicons.glyphMap;
+  iconPosition?: 'left' | 'right';
   style?: ViewStyle;
   textStyle?: TextStyle;
   disabled?: boolean;
+  fullWidth?: boolean;
 }
 
 export const ActionButton: React.FC<ActionButtonProps> = ({
@@ -19,9 +24,13 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   onPress,
   loading = false,
   variant = 'primary',
+  size = 'large',
+  icon,
+  iconPosition = 'right',
   style,
   textStyle,
   disabled = false,
+  fullWidth = true,
 }) => {
   const mode = useSelector((state: RootState) => state.theme.mode);
   const colors = ThemeColors[mode];
@@ -30,18 +39,23 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
     switch (variant) {
       case 'secondary':
         return {
-          backgroundColor: mode === 'light' ? '#F2F2F7' : '#1C1C1E',
+          backgroundColor: colors.surfaceSecondary,
           borderWidth: 0,
         };
       case 'outline':
         return {
           backgroundColor: 'transparent',
-          borderWidth: 1,
+          borderWidth: 1.5,
           borderColor: colors.border,
         };
       case 'danger':
         return {
-          backgroundColor: '#FF3B30', // Minimal system red warning
+          backgroundColor: colors.errorRed,
+          borderWidth: 0,
+        };
+      case 'ghost':
+        return {
+          backgroundColor: 'transparent',
           borderWidth: 0,
         };
       case 'primary':
@@ -53,46 +67,61 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
     }
   };
 
-  const getTextStyle = (): TextStyle => {
+  const getTextColor = (): string => {
     switch (variant) {
       case 'secondary':
-        return {
-          color: colors.textPrimary,
-        };
+        return colors.textPrimary;
       case 'outline':
-        return {
-          color: colors.textPrimary,
-        };
+        return colors.textPrimary;
       case 'danger':
-        return {
-          color: '#FFFFFF',
-        };
+        return '#FFFFFF';
+      case 'ghost':
+        return colors.primaryAccent;
       case 'primary':
       default:
-        return {
-          color: mode === 'light' ? '#FFFFFF' : '#000000',
-        };
+        return '#FFFFFF';
     }
   };
 
-  const activeOpacity = disabled || loading ? 0.7 : 0.2;
+  const sizeStyles: Record<string, ViewStyle> = {
+    large: { height: 52, paddingHorizontal: Spacing.xxl, borderRadius: Radius.lg },
+    medium: { height: 44, paddingHorizontal: Spacing.xl, borderRadius: Radius.md },
+    small: { height: 36, paddingHorizontal: Spacing.lg, borderRadius: Radius.sm },
+  };
+
+  const textColor = getTextColor();
+  const iconSize = size === 'small' ? 14 : size === 'medium' ? 16 : 18;
+  const typo = size === 'small' ? Typography.chipText : Typography.buttonLarge;
 
   return (
     <TouchableOpacity
-      activeOpacity={activeOpacity}
+      activeOpacity={disabled || loading ? 0.7 : 0.6}
       onPress={onPress}
       disabled={disabled || loading}
       style={[
         styles.button,
+        sizeStyles[size],
         getButtonStyles(),
+        !fullWidth && { alignSelf: 'flex-start' },
         disabled && { opacity: 0.5 },
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' && mode === 'light' ? colors.primaryAccent : '#FFFFFF'} size="small" />
+        <ActivityIndicator
+          color={variant === 'outline' ? colors.primaryAccent : '#FFFFFF'}
+          size="small"
+        />
       ) : (
-        <Text style={[styles.text, getTextStyle(), textStyle]}>{title}</Text>
+        <View style={styles.content}>
+          {icon && iconPosition === 'left' && (
+            <Ionicons name={icon} size={iconSize} color={textColor} style={{ marginRight: Spacing.sm }} />
+          )}
+          <Text style={[typo, { color: textColor }, textStyle]}>{title}</Text>
+          {icon && iconPosition === 'right' && (
+            <Ionicons name={icon} size={iconSize} color={textColor} style={{ marginLeft: Spacing.sm }} />
+          )}
+        </View>
       )}
     </TouchableOpacity>
   );
@@ -100,17 +129,13 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    height: 52,
-    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
     flexDirection: 'row',
-    marginVertical: 8,
   },
-  text: {
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.3,
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

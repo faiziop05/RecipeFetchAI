@@ -324,23 +324,23 @@ export default function VaultScreen() {
   }) => {
     const itemCategory = getRecipeCategory(item);
     const itemEmoji = CATEGORY_EMOJIS[itemCategory] || "🍲";
-    const GRADIENT_OPTIONS = [
-      ThemeGradients.cardYellow,
-      ThemeGradients.cardGreen,
-      ThemeGradients.cardPurple,
-      ThemeGradients.cardBlue,
-      ThemeGradients.cardPink,
-      ThemeGradients.cardOrange,
-      ThemeGradients.cardCyan,
+    const GRADIENT_OPTIONS = mode === 'dark' ? [
+      ThemeGradients.cardWarmDark,
+      ThemeGradients.cardMintDark,
+      ThemeGradients.cardCoolDark,
+    ] : [
+      ThemeGradients.cardWarm,
+      ThemeGradients.cardMint,
+      ThemeGradients.cardCool,
     ];
     const gradient = GRADIENT_OPTIONS[index % GRADIENT_OPTIONS.length];
 
     if (layoutMode === "grid") {
       return (
-        <CardContainer gradient={gradient} style={[styles.gridCard]}>
+        <CardContainer style={[styles.gridCard, { borderColor: colors.border }]}>
           {item.isPinned && (
             <View style={styles.gridPinBadge}>
-              <Ionicons name="bookmark" size={12} color="#1C1917" />
+              <Ionicons name="bookmark" size={14} color={colors.primaryAccent} />
             </View>
           )}
           <TouchableOpacity
@@ -351,8 +351,11 @@ export default function VaultScreen() {
               style={[
                 styles.gridIconContainer,
                 {
-                  backgroundColor: "rgba(0,0,0,0.05)",
-                  borderColor: "rgba(0,0,0,0.1)",
+                  backgroundColor:
+                    mode === "light"
+                      ? "rgba(0,0,0,0.05)"
+                      : "rgba(255,255,255,0.08)",
+                  borderColor: colors.border,
                 },
               ]}
             >
@@ -360,7 +363,7 @@ export default function VaultScreen() {
             </View>
             <Text
               numberOfLines={2}
-              style={[styles.gridTitle, { color: "#1C1917" }]}
+              style={[styles.gridTitle, { color: colors.textPrimary }]}
             >
               {item.title}
             </Text>
@@ -369,13 +372,13 @@ export default function VaultScreen() {
                 <Ionicons
                   name="time-outline"
                   size={12}
-                  color="rgba(28, 25, 23, 0.7)"
+                  color={colors.textSecondary}
                 />
                 <Text
                   numberOfLines={1}
                   style={[
                     styles.metaTextGrid,
-                    { color: "rgba(28, 25, 23, 0.7)" },
+                    { color: colors.textSecondary },
                   ]}
                 >
                   {item.prepTime}
@@ -385,13 +388,13 @@ export default function VaultScreen() {
                 <Ionicons
                   name="flame-outline"
                   size={12}
-                  color="rgba(28, 25, 23, 0.7)"
+                  color={colors.textSecondary}
                 />
                 <Text
                   numberOfLines={1}
                   style={[
                     styles.metaTextGrid,
-                    { color: "rgba(28, 25, 23, 0.7)" },
+                    { color: colors.textSecondary },
                   ]}
                 >
                   {item.calories}
@@ -411,13 +414,16 @@ export default function VaultScreen() {
 
     // List mode card styling
     return (
-      <CardContainer gradient={gradient} style={[styles.recipeCard]}>
+      <CardContainer style={[styles.recipeCard, { borderColor: colors.border }]}>
         <View
           style={[
             styles.listIconContainer,
             {
-              backgroundColor: "rgba(0,0,0,0.05)",
-              borderColor: "rgba(0,0,0,0.1)",
+              backgroundColor:
+                mode === "light"
+                  ? "rgba(0,0,0,0.05)"
+                  : "rgba(255,255,255,0.08)",
+              borderColor: colors.border,
             },
           ]}
         >
@@ -428,7 +434,7 @@ export default function VaultScreen() {
           onPress={() => handleSelectRecipe(item)}
           style={styles.cardInfoContainer}
         >
-          <Text style={[styles.recipeTitle, { color: "#1C1917" }]}>
+          <Text style={[styles.recipeTitle, { color: colors.textPrimary }]}>
             {item.title}
           </Text>
           <View style={styles.metadataRow}>
@@ -436,10 +442,10 @@ export default function VaultScreen() {
               <Ionicons
                 name="time-outline"
                 size={14}
-                color="rgba(28, 25, 23, 0.7)"
+                color={colors.textSecondary}
               />
               <Text
-                style={[styles.metaText, { color: "rgba(28, 25, 23, 0.7)" }]}
+                style={[styles.metaText, { color: colors.textSecondary }]}
               >
                 {item.prepTime}
               </Text>
@@ -448,25 +454,33 @@ export default function VaultScreen() {
               <Ionicons
                 name="flame-outline"
                 size={14}
-                color="rgba(28, 25, 23, 0.7)"
+                color={colors.textSecondary}
               />
               <Text
-                style={[styles.metaText, { color: "rgba(28, 25, 23, 0.7)" }]}
+                style={[styles.metaText, { color: colors.textSecondary }]}
               >
                 {item.calories}
               </Text>
             </View>
             <View
-              style={[styles.tagBadge, { backgroundColor: "rgba(0,0,0,0.05)" }]}
+              style={[
+                styles.tagBadge,
+                {
+                  backgroundColor:
+                    mode === "light"
+                      ? "rgba(0,0,0,0.05)"
+                      : "rgba(255,255,255,0.08)",
+                },
+              ]}
             >
               <Text
-                style={[styles.tagText, { color: "rgba(28, 25, 23, 0.7)" }]}
+                style={[styles.tagText, { color: colors.textSecondary }]}
               >
                 {itemCategory}
               </Text>
             </View>
             {item.isPinned && (
-              <View style={[styles.tagBadge, { backgroundColor: "#1C1917" }]}>
+              <View style={[styles.tagBadge, { backgroundColor: colors.primaryAccent }]}>
                 <Text style={[styles.tagText, { color: "#FFFFFF" }]}>
                   Pinned
                 </Text>
@@ -1022,6 +1036,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 20,
     borderRadius: 24,
+    marginBottom: 14,
   },
   cardInfoContainer: {
     flex: 1,
@@ -1072,6 +1087,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     position: "relative",
     justifyContent: "space-between",
+    marginBottom: 14,
   },
   gridPinBadge: {
     position: "absolute",

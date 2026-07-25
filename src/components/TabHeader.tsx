@@ -3,7 +3,7 @@ import { StyleSheet, View, Text } from "react-native";
 import { useSelector } from "react-redux";
 
 import { RootState } from "@/store";
-import { ThemeColors } from "@/theme/colors";
+import { ThemeColors, Typography, Spacing } from "@/theme/colors";
 
 interface TabHeaderProps {
   title: string;
@@ -16,14 +16,14 @@ export function TabHeader({ title, subtitle, rightElement }: TabHeaderProps) {
   const colors = ThemeColors[mode];
 
   return (
-    <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
+    <View style={[styles.header, { backgroundColor: colors.background }]}>
       <View style={styles.titleContainer}>
         {subtitle ? (
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          <Text style={[Typography.overline, styles.subtitle, { color: colors.textTertiary }]}>
             {subtitle}
           </Text>
         ) : null}
-        <Text style={[styles.title, { color: colors.textPrimary }]}>
+        <Text style={[Typography.screenTitle, { color: colors.textPrimary }]}>
           {title}
         </Text>
       </View>
@@ -35,34 +35,25 @@ export function TabHeader({ title, subtitle, rightElement }: TabHeaderProps) {
 const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    minHeight: 76,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.lg,
+    minHeight: 72,
   },
   titleContainer: {
     flexDirection: "column",
-    justifyContent: "center",
+    justifyContent: "flex-end",
     flex: 1,
   },
   subtitle: {
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
     marginBottom: 2,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "900",
-    letterSpacing: -0.5,
   },
   rightContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
-    marginLeft: 12,
+    marginLeft: Spacing.md,
   },
 });

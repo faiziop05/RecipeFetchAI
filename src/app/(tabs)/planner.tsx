@@ -345,9 +345,12 @@ export default function PlannerScreen() {
     const isRegenLoading =
       activeRegenKey?.date === date && activeRegenKey?.mealType === mealType;
     let gradient: readonly [string, string, ...string[]] | undefined;
-    if (mealType === "breakfast") gradient = ThemeGradients.cardYellow;
-    else if (mealType === "lunch") gradient = ThemeGradients.cardGreen;
-    else gradient = ThemeGradients.cardPurple;
+    if (mealType === "breakfast") gradient = mode === 'dark' ? ThemeGradients.cardWarmDark : ThemeGradients.cardWarm;
+    else if (mealType === "lunch") gradient = mode === 'dark' ? ThemeGradients.cardMintDark : ThemeGradients.cardMint;
+    else gradient = mode === 'dark' ? ThemeGradients.cardCoolDark : ThemeGradients.cardCool;
+
+    const mealTextColor = mode === 'dark' ? colors.textPrimary : '#1C1917';
+    const mealSubColor = mode === 'dark' ? colors.textSecondary : 'rgba(28, 25, 23, 0.7)';
 
     return (
       <CardContainer key={mealType} gradient={gradient} style={styles.mealCard}>
@@ -355,14 +358,14 @@ export default function PlannerScreen() {
           <View style={styles.mealTypeRow}>
             <Text style={styles.mealEmoji}>{emoji}</Text>
             <Text
-              style={[styles.mealTypeName, { color: "rgba(28, 25, 23, 0.7)" }]}
+              style={[styles.mealTypeName, { color: mealSubColor }]}
             >
               {mealType}
             </Text>
           </View>
           <View style={styles.actions}>
             {isRegenLoading ? (
-              <ActivityIndicator size="small" color="#1C1917" />
+              <ActivityIndicator size="small" color={colors.primaryAccent} />
             ) : (
               <TouchableOpacity
                 onPress={() => handleRegenerateMeal(date, dayName, mealType)}
@@ -371,7 +374,7 @@ export default function PlannerScreen() {
                 <Ionicons
                   name="refresh"
                   size={16}
-                  color="rgba(28, 25, 23, 0.7)"
+                  color={mealSubColor}
                 />
               </TouchableOpacity>
             )}
@@ -380,28 +383,28 @@ export default function PlannerScreen() {
 
         {meal ? (
           <View style={styles.mealContent}>
-            <Text style={[styles.mealTitle, { color: "#1C1917" }]}>
+            <Text style={[styles.mealTitle, { color: mealTextColor }]}>
               {meal.title}
             </Text>
             <View style={styles.mealMeta}>
               <Text
-                style={[styles.metaText, { color: "rgba(28, 25, 23, 0.7)" }]}
+                style={[styles.metaText, { color: mealSubColor }]}
               >
                 {meal.prepTime}
               </Text>
               <Text
-                style={[styles.metaDot, { color: "rgba(28, 25, 23, 0.7)" }]}
+                style={[styles.metaDot, { color: mealSubColor }]}
               >
                 •
               </Text>
               <Text
-                style={[styles.metaText, { color: "rgba(28, 25, 23, 0.7)" }]}
+                style={[styles.metaText, { color: mealSubColor }]}
               >
                 {meal.calories}
               </Text>
             </View>
             <TouchableOpacity
-              style={[styles.cookBtn, { backgroundColor: "#1C1917" }]}
+              style={[styles.cookBtn, { backgroundColor: colors.primaryAccent }]}
               onPress={() => handleStartCook(meal)}
             >
               <Text style={[styles.cookBtnText, { color: "#FFFFFF" }]}>
@@ -411,7 +414,7 @@ export default function PlannerScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <Text style={[styles.noMealText, { color: "rgba(28, 25, 23, 0.7)" }]}>
+          <Text style={[styles.noMealText, { color: mealSubColor }]}>
             No meal scheduled
           </Text>
         )}

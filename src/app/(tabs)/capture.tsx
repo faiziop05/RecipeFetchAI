@@ -19,19 +19,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 
 import { ActionButton } from "@/components/ActionButton";
+import { CardContainer } from "@/components/CardContainer";
 import { CustomAlert } from "@/components/CustomAlert";
+import { TabHeader } from "@/components/TabHeader";
 import { db } from "@/services/firebase";
 import { extractRecipe } from "@/services/gemini";
 import { RootState } from "@/store";
 import { setActiveRecipe } from "@/store/recipeSlice";
-import { TabHeader } from "@/components/TabHeader";
 import {
   checkMonthRollover,
   incrementFreeScan,
 } from "@/store/subscriptionSlice";
-import { ThemeColors, ThemeGradients } from "@/theme/colors";
+import { ThemeColors, Typography, Spacing, Radius } from "@/theme/colors";
 import { useNetInfo } from "@react-native-community/netinfo";
-import { LinearGradient } from "expo-linear-gradient";
 
 export default function CaptureScreen() {
   const router = useRouter();
@@ -163,28 +163,6 @@ export default function CaptureScreen() {
     }
   };
 
-  // Prompts user to select between Camera and Gallery inside a single scanner viewport trigger
-  const handleScannerPress = () => {
-    showAlert(
-      "Scan Recipe Page",
-      "Choose a capture source to extract structured ingredients and chronological steps instantly:",
-      "confirm",
-      [
-        {
-          text: "Camera (Take Photo)",
-          onPress: triggerCamera,
-          style: "default",
-        },
-        {
-          text: "Photo Library (Gallery)",
-          onPress: triggerGallery,
-          style: "default",
-        },
-        { text: "Cancel", style: "cancel" },
-      ],
-    );
-  };
-
   // Submit trigger to AI core
   const handleExtractRecipe = async () => {
     if (netInfo.isConnected === false) {
@@ -199,7 +177,7 @@ export default function CaptureScreen() {
     if (!recipeLink.trim() && !imageBase64) {
       showAlert(
         "Input Required",
-        "Please paste a valid cooking web link or scan a recipe photo to initiate AI extraction.",
+        "Please paste a recipe link or scan a photo to extract a recipe.",
         "info",
       );
       return;
@@ -301,6 +279,13 @@ export default function CaptureScreen() {
     setImageBase64(null);
   };
 
+  const platforms = [
+    { icon: "logo-youtube" as const, label: "YouTube", color: "#FF0000" },
+    { icon: "logo-instagram" as const, label: "Instagram", color: "#E1306C" },
+    { icon: "logo-tiktok" as const, label: "TikTok", color: mode === "light" ? "#000000" : "#FFFFFF" },
+    { icon: "logo-google" as const, label: "Google", color: "#4285F4" },
+  ];
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: "transparent" }}
@@ -309,274 +294,175 @@ export default function CaptureScreen() {
       <TabHeader title="Scan & Import" subtitle="ADD RECIPE" />
 
       <ScrollView
-        style={[styles.container, { backgroundColor: "transparent" }]}
-        contentContainerStyle={[styles.scrollContent]}
+        style={{ flex: 1, backgroundColor: "transparent" }}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        {/* Description/Instruction text at the top of content */}
-        <Text style={[styles.descriptionText, { color: colors.textSecondary }]}>
-          Transform any cooking website link or cookbook photo into a clean,
-          beautifully formatted recipe page instantly.
+        <Text style={[Typography.body, { color: colors.textSecondary, marginBottom: Spacing.xl }]}>
+          Transform any cooking link or cookbook photo into a structured recipe.
         </Text>
 
-        {/* Modern Minimal Link Field */}
-        <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-            Web Link
-          </Text>
-          <View style={styles.inputWrapper}>
+        {/* URL Input Section */}
+        <Text style={[Typography.overline, { color: colors.textTertiary, marginBottom: Spacing.sm }]}>
+          WEB LINK
+        </Text>
+        <View style={styles.inputWrapper}>
+          <View style={[
+            styles.inputContainer,
+            {
+              backgroundColor: colors.surface,
+              borderColor: isInputFocused ? colors.primaryAccent : colors.border,
+            },
+          ]}>
+            <Ionicons name="link-outline" size={18} color={colors.textTertiary} style={{ marginRight: Spacing.sm }} />
             <TextInput
               placeholder="Paste recipe link..."
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textTertiary}
               value={recipeLink}
               onChangeText={(txt) => {
                 setRecipeLink(txt);
-                if (txt) handleClearImage(); // Clear image if typing link
+                if (txt) handleClearImage();
               }}
               onFocus={() => setIsInputFocused(true)}
               onBlur={() => setIsInputFocused(false)}
-              style={[
-                styles.linkInput,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: isInputFocused
-                    ? colors.primaryAccent
-                    : colors.border,
-                  color: colors.textPrimary,
-                },
-              ]}
+              style={[styles.linkInput, { color: colors.textPrimary }]}
               autoCapitalize="none"
               autoCorrect={false}
               multiline={false}
               numberOfLines={1}
             />
             <TouchableOpacity
-              style={[
-                styles.pasteBtn,
-                {
-                  backgroundColor:
-                    mode === "light"
-                      ? "rgba(0,0,0,0.05)"
-                      : "rgba(255,255,255,0.08)",
-                },
-              ]}
+              style={[styles.pasteBtn, { backgroundColor: colors.primaryAccentMuted }]}
               onPress={handlePasteLink}
             >
-              <Text style={[styles.pasteText, { color: colors.primaryAccent }]}>
+              <Text style={[Typography.chipText, { color: colors.primaryAccent }]}>
                 Paste
               </Text>
             </TouchableOpacity>
           </View>
-          <Text style={[styles.inputHint, { color: colors.textSecondary }]}>
-            Paste any recipe link from the web, or extract directly from cooking
-            videos on:
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.supportedPlatformsRow}
-            style={styles.platformsScroll}
-          >
-            <View
-              style={[
-                styles.platformChip,
-                {
-                  backgroundColor:
-                    mode === "light"
-                      ? "rgba(255, 0, 0, 0.08)"
-                      : "rgba(255, 0, 0, 0.15)",
-                },
-              ]}
-            >
-              <Ionicons name="logo-youtube" size={14} color="#FF0000" />
-              <Text style={[styles.platformText, { color: "#FF0000" }]}>
-                YouTube
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.platformChip,
-                {
-                  backgroundColor:
-                    mode === "light"
-                      ? "rgba(225, 48, 108, 0.08)"
-                      : "rgba(225, 48, 108, 0.15)",
-                },
-              ]}
-            >
-              <Ionicons name="logo-instagram" size={14} color="#E1306C" />
-              <Text style={[styles.platformText, { color: "#E1306C" }]}>
-                Instagram
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.platformChip,
-                {
-                  backgroundColor:
-                    mode === "light"
-                      ? "rgba(0, 0, 0, 0.05)"
-                      : "rgba(255, 255, 255, 0.1)",
-                },
-              ]}
-            >
-              <Ionicons
-                name="logo-tiktok"
-                size={14}
-                color={mode === "light" ? "#000000" : "#FFFFFF"}
-              />
-              <Text
-                style={[
-                  styles.platformText,
-                  { color: mode === "light" ? "#000000" : "#FFFFFF" },
-                ]}
-              >
-                TikTok
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.platformChip,
-                {
-                  backgroundColor:
-                    mode === "light"
-                      ? "rgba(66, 133, 244, 0.08)"
-                      : "rgba(66, 133, 244, 0.15)",
-                },
-              ]}
-            >
-              <Ionicons name="logo-google" size={14} color="#4285F4" />
-              <Text style={[styles.platformText, { color: "#4285F4" }]}>
-                Google
-              </Text>
-            </View>
-          </ScrollView>
         </View>
 
-        {/* Unified Camera/Gallery Viewport Scanner */}
-        <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-            Visual Scan
-          </Text>
-
-          {selectedImage ? (
+        {/* Supported Platforms */}
+        <View style={styles.platformsRow}>
+          {platforms.map((p, i) => (
             <View
-              style={[
-                styles.imagePreviewContainer,
-                { borderColor: colors.border },
-              ]}
+              key={i}
+              style={[styles.platformChip, { backgroundColor: `${p.color}10` }]}
             >
-              <Image
-                source={{ uri: selectedImage }}
-                style={styles.imagePreview}
-              />
-              <TouchableOpacity
-                style={styles.clearImageBtn}
-                onPress={handleClearImage}
-              >
-                <Ionicons
-                  name="close-circle"
-                  size={36}
-                  color={colors.textPrimary}
-                />
-              </TouchableOpacity>
+              <Ionicons name={p.icon} size={12} color={p.color} />
+              <Text style={[styles.platformText, { color: p.color }]}>
+                {p.label}
+              </Text>
             </View>
-          ) : (
-            <View style={styles.scannerRow}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={triggerCamera}
-                style={{ flex: 1 }}
-              >
-                <LinearGradient
-                  colors={ThemeGradients.cardOrange}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={[styles.scannerHalfCard, { borderColor: colors.border }]}
-                >
-                  <View style={[styles.scannerIconWrapper, { backgroundColor: 'rgba(0,0,0,0.05)', borderColor: colors.border }]}>
-                    <Ionicons name="camera-outline" size={22} color="#1C1917" />
-                  </View>
-                  <Text style={[styles.scannerLabel, { color: "#1C1917" }]}>Camera</Text>
-                  <Text style={[styles.scannerSublabel, { color: "rgba(28, 25, 23, 0.7)" }]}>Scan cookbook page</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+          ))}
+        </View>
 
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={triggerGallery}
-                style={{ flex: 1 }}
-              >
-                <LinearGradient
-                  colors={ThemeGradients.cardBlue}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={[styles.scannerHalfCard, { borderColor: colors.border }]}
-                >
-                  <View style={[styles.scannerIconWrapper, { backgroundColor: 'rgba(0,0,0,0.05)', borderColor: colors.border }]}>
-                    <Ionicons name="images-outline" size={22} color="#1C1917" />
-                  </View>
-                  <Text style={[styles.scannerLabel, { color: "#1C1917" }]}>Gallery</Text>
-                  <Text style={[styles.scannerSublabel, { color: "rgba(28, 25, 23, 0.7)" }]}>Upload from library</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+        {/* Visual Scan Section */}
+        <Text style={[Typography.overline, { color: colors.textTertiary, marginBottom: Spacing.sm, marginTop: Spacing.xxl }]}>
+          VISUAL SCAN
+        </Text>
 
-          )}
-
-          {/* Manual Creation Card */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => router.push("/manual-recipe")}
-            style={{ marginTop: 12 }}
+        {selectedImage ? (
+          <View
+            style={[
+              styles.imagePreviewContainer,
+              { borderColor: colors.border },
+            ]}
           >
-            <LinearGradient
-              colors={ThemeGradients.cardPink}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={[styles.manualInputCard, { borderColor: colors.border }]}
+            <Image
+              source={{ uri: selectedImage }}
+              style={styles.imagePreview}
+            />
+            <TouchableOpacity
+              style={[styles.clearImageBtn, { backgroundColor: colors.overlay }]}
+              onPress={handleClearImage}
             >
-              <View style={styles.manualRow}>
-                <View style={[styles.scannerIconWrapper, { backgroundColor: 'rgba(0,0,0,0.05)', borderColor: colors.border, marginRight: 14 }]}>
-                  <Ionicons name="create-outline" size={20} color="#1C1917" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.scannerLabel, { color: "#1C1917" }]}>Manual Creation</Text>
-                  <Text style={[styles.scannerSublabel, { color: "rgba(28, 25, 23, 0.7)" }]}>Type raw recipe details</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="rgba(28, 25, 23, 0.5)" />
+              <Ionicons name="close" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.scannerRow}>
+            <CardContainer
+              style={styles.scannerCard}
+              onPress={triggerCamera}
+            >
+              <View style={[styles.scannerIconWrap, { backgroundColor: colors.primaryAccentMuted }]}>
+                <Ionicons name="camera-outline" size={22} color={colors.primaryAccent} />
               </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+              <Text style={[Typography.label, { color: colors.textPrimary, marginTop: Spacing.sm }]}>Camera</Text>
+              <Text style={[Typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
+                Scan cookbook
+              </Text>
+            </CardContainer>
 
-        {/* Premium Submit Button */}
+            <CardContainer
+              style={styles.scannerCard}
+              onPress={triggerGallery}
+            >
+              <View style={[styles.scannerIconWrap, { backgroundColor: colors.primaryAccentMuted }]}>
+                <Ionicons name="images-outline" size={22} color={colors.primaryAccent} />
+              </View>
+              <Text style={[Typography.label, { color: colors.textPrimary, marginTop: Spacing.sm }]}>Gallery</Text>
+              <Text style={[Typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
+                Upload photo
+              </Text>
+            </CardContainer>
+          </View>
+        )}
+
+        {/* Manual Creation */}
+        <CardContainer
+          style={styles.manualCard}
+          onPress={() => router.push("/manual-recipe")}
+        >
+          <View style={styles.manualRow}>
+            <View style={[styles.scannerIconWrap, { backgroundColor: colors.primaryAccentMuted }]}>
+              <Ionicons name="create-outline" size={20} color={colors.primaryAccent} />
+            </View>
+            <View style={{ flex: 1, marginLeft: Spacing.md }}>
+              <Text style={[Typography.label, { color: colors.textPrimary }]}>Manual Creation</Text>
+              <Text style={[Typography.caption, { color: colors.textSecondary }]}>
+                Type recipe details by hand
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+          </View>
+        </CardContainer>
+
+        {/* Submit Button */}
         <ActionButton
           title="Extract Recipe"
+          icon="sparkles-outline"
           onPress={handleExtractRecipe}
-          style={styles.submitBtn}
+          style={{ marginTop: Spacing.xl }}
         />
 
-        {/* Minimal Loading Overlay Modal */}
+        {/* Loading Overlay */}
         <Modal visible={loading} transparent animationType="fade">
           <View style={styles.overlayBackground}>
             <View
               style={[
                 styles.overlayContent,
-                { backgroundColor: colors.background, borderColor: colors.border },
+                { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
             >
               <ActivityIndicator size="small" color={colors.primaryAccent} />
               <Text
-                style={[styles.overlayTitle, { color: colors.textPrimary }]}
+                style={[Typography.cardTitle, { color: colors.textPrimary, marginTop: Spacing.lg }]}
               >
-                RecipeFetch AI
+                Extracting Recipe
               </Text>
               <Text
-                style={[styles.overlayStep, { color: colors.textSecondary }]}
+                style={[Typography.caption, { color: colors.textSecondary, marginTop: Spacing.xs }]}
               >
                 {loadingStep}
               </Text>
             </View>
           </View>
         </Modal>
-        <View style={{ height: 150 }} />
+
+        <View style={{ height: 120 }} />
       </ScrollView>
 
       <CustomAlert
@@ -592,193 +478,72 @@ export default function CaptureScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   scrollContent: {
-    padding: 20,
-    paddingTop: 20,
-    paddingBottom: 60,
-  },
-  descriptionText: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  sectionContainer: {
-    marginBottom: 18,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 10,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.sm,
   },
   inputWrapper: {
+    width: "100%",
+  },
+  inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    position: "relative",
-    width: "100%",
-    justifyContent: "center",
+    borderWidth: 1.5,
+    borderRadius: Radius.md,
+    paddingLeft: Spacing.lg,
+    paddingRight: Spacing.xs,
+    height: 52,
   },
   linkInput: {
-    height: 52,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingLeft: 16,
-    paddingRight: 75,
-    fontSize: 15,
     flex: 1,
+    fontSize: 15,
+    height: "100%",
   },
   pasteBtn: {
-    position: "absolute",
-    right: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.sm,
   },
-  pasteText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  inputHint: {
-    fontSize: 13,
-    fontWeight: "600",
-    marginTop: 12,
-    paddingHorizontal: 4,
-    lineHeight: 18,
-  },
-  platformsScroll: {
-    marginTop: 8,
-    marginHorizontal: -20,
-  },
-  supportedPlatformsRow: {
+  platformsRow: {
     flexDirection: "row",
-    paddingHorizontal: 20,
-    paddingBottom: 4,
-    gap: 8,
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+    flexWrap: "wrap",
   },
   platformChip: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: Spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: Radius.sm,
     gap: 4,
   },
   platformText: {
-    fontSize: 11,
-    fontWeight: "800",
+    fontSize: 10,
+    fontWeight: "700",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   scannerRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-    gap: 12,
+    gap: Spacing.md,
   },
-  scannerHalfCard: {
+  scannerCard: {
     flex: 1,
-    height: 175,
-    borderWidth: 1,
-    borderRadius: 20,
-    justifyContent: "center",
     alignItems: "center",
-    position: "relative",
-    paddingHorizontal: 12,
-    paddingVertical: 20,
+    justifyContent: "center",
+    paddingVertical: Spacing.xxl,
   },
-  scannerIconWrapper: {
+  scannerIconWrap: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
-  },
-  cardArrow: {
-    position: "absolute",
-    top: 14,
-    right: 14,
-    opacity: 0.6,
-  },
-  cropCornerHalf: {
-    position: "absolute",
-    width: 12,
-    height: 12,
-  },
-  cropTopLeftHalf: {
-    top: 8,
-    left: 8,
-    borderTopWidth: 2,
-    borderLeftWidth: 2,
-  },
-  cropTopRightHalf: {
-    top: 8,
-    right: 8,
-    borderTopWidth: 2,
-    borderRightWidth: 2,
-  },
-  cropBottomLeftHalf: {
-    bottom: 8,
-    left: 8,
-    borderBottomWidth: 2,
-    borderLeftWidth: 2,
-  },
-  cropBottomRightHalf: {
-    bottom: 8,
-    right: 8,
-    borderBottomWidth: 2,
-    borderRightWidth: 2,
-  },
-  cropCorner: {
-    position: "absolute",
-    width: 16,
-    height: 16,
-  },
-  cropTopLeft: {
-    top: 12,
-    left: 12,
-    borderTopWidth: 2,
-    borderLeftWidth: 2,
-  },
-  cropTopRight: {
-    top: 12,
-    right: 12,
-    borderTopWidth: 2,
-    borderRightWidth: 2,
-  },
-  cropBottomLeft: {
-    bottom: 12,
-    left: 12,
-    borderBottomWidth: 2,
-    borderLeftWidth: 2,
-  },
-  cropBottomRight: {
-    bottom: 12,
-    right: 12,
-    borderBottomWidth: 2,
-    borderRightWidth: 2,
-  },
-  scannerLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 0.2,
-    marginTop: 2,
-  },
-  scannerSublabel: {
-    fontSize: 10,
-    textAlign: "center",
-    marginTop: 3,
-    lineHeight: 13,
-    paddingHorizontal: 4,
   },
   imagePreviewContainer: {
     height: 200,
-    borderRadius: 16,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     position: "relative",
     overflow: "hidden",
@@ -790,47 +555,32 @@ const styles = StyleSheet.create({
   },
   clearImageBtn: {
     position: "absolute",
-    top: 12,
-    right: 12,
-  },
-  submitBtn: {
-    marginTop: 10,
-    height: 56,
-  },
-  overlayBackground: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  overlayContent: {
-    padding: 24,
+    top: Spacing.sm,
+    right: Spacing.sm,
+    width: 32,
+    height: 32,
     borderRadius: 16,
-    borderWidth: 1,
     alignItems: "center",
-    width: "75%",
+    justifyContent: "center",
   },
-  overlayTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    marginTop: 12,
-    letterSpacing: -0.5,
-  },
-  overlayStep: {
-    fontSize: 13,
-    marginTop: 6,
-    textAlign: "center",
-  },
-  manualInputCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 16,
-    marginTop: 16,
-    width: "100%",
+  manualCard: {
+    marginTop: Spacing.md,
   },
   manualRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+  },
+  overlayBackground: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  overlayContent: {
+    padding: Spacing.xxl,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    alignItems: "center",
+    width: "75%",
   },
 });

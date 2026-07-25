@@ -11,10 +11,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 
 import { CardContainer } from "@/components/CardContainer";
-import { TabHeader } from "@/components/TabHeader";
 import { RootState } from "@/store";
 import { setActiveRecipe } from "@/store/recipeSlice";
-import { ThemeColors, ThemeGradients } from "@/theme/colors";
+import { ThemeColors, ThemeGradients, Typography, Spacing, Radius } from "@/theme/colors";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -36,6 +35,16 @@ export default function HomeScreen() {
   const todayStr = new Date().toISOString().split("T")[0];
   const todayPlan = weeklyPlan.find((day) => day.date === todayStr);
 
+  // Greeting based on time
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  };
+
+  const userName = userEmail ? userEmail.split("@")[0] : "Chef";
+
   const handleSelectMeal = (meal: any) => {
     if (!meal) return;
     dispatch(
@@ -53,307 +62,260 @@ export default function HomeScreen() {
     router.push("/recipe-display");
   };
 
+  const quickActions = [
+    {
+      icon: "scan-outline" as const,
+      label: "Scan Recipe",
+      desc: "From link or photo",
+      route: "/(tabs)/capture" as const,
+    },
+    {
+      icon: "restaurant-outline" as const,
+      label: "What to Cook",
+      desc: "Match ingredients",
+      route: "/(tabs)/pantry" as const,
+    },
+    {
+      icon: "create-outline" as const,
+      label: "Create Recipe",
+      desc: "Manual entry",
+      route: "/manual-recipe" as const,
+    },
+    {
+      icon: "calendar-outline" as const,
+      label: "Meal Planner",
+      desc: "Plan your week",
+      route: "/(tabs)/planner" as const,
+    },
+  ];
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: "transparent" }}
       edges={["top"]}
     >
-      <TabHeader
-        title="Home"
-        subtitle="MY KITCHEN"
-        rightElement={
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => router.push("/preferences")}
-            style={[
-              styles.avatarBtn,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.avatarText, { color: colors.primaryAccent }]}>
-              {userEmail ? userEmail.substring(0, 2).toUpperCase() : "US"}
-            </Text>
-            {isPremium && (
-              <View style={styles.premiumIndicator}>
-                <Ionicons name="sparkles" size={10} color="#FFCC00" />
-              </View>
-            )}
-          </TouchableOpacity>
-        }
-      />
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: colors.background }]}>
+        <View style={styles.greetingContainer}>
+          <Text style={[Typography.overline, { color: colors.textTertiary }]}>
+            {getGreeting()}
+          </Text>
+          <Text style={[Typography.screenTitle, { color: colors.textPrimary }]}>
+            {userName}
+          </Text>
+        </View>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => router.push("/preferences")}
+          style={[
+            styles.avatarBtn,
+            { backgroundColor: colors.primaryAccentMuted, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.avatarText, { color: colors.primaryAccent }]}>
+            {userEmail ? userEmail.substring(0, 2).toUpperCase() : "US"}
+          </Text>
+          {isPremium && (
+            <View style={[styles.premiumBadge, { backgroundColor: colors.primaryAccent }]}>
+              <Ionicons name="sparkles" size={8} color="#FFFFFF" />
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
-        style={[styles.scroll, { backgroundColor: "transparent" }]}
+        style={{ flex: 1, backgroundColor: "transparent" }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Bento Grid */}
-        <View style={styles.grid}>
-          {/* Today's Plan Card (Large Top Card) */}
-          <CardContainer
-            gradient={ThemeGradients.cardYellow}
-            style={[styles.todayCard, colors.cardShadow]}
-          >
-            <View style={styles.cardHeader}>
-              <Ionicons name="calendar-outline" size={20} color="#1C1917" />
-              <Text style={[styles.cardTitle, { color: "#1C1917" }]}>
+        {/* Today's Plan Card */}
+        <CardContainer style={styles.todayCard}>
+          <View style={styles.todayHeader}>
+            <View style={[styles.todayIconWrap, { backgroundColor: colors.primaryAccentMuted }]}>
+              <Ionicons name="sunny-outline" size={18} color={colors.primaryAccent} />
+            </View>
+            <View>
+              <Text style={[Typography.cardTitle, { color: colors.textPrimary }]}>
                 Today's Plan
               </Text>
+              <Text style={[Typography.caption, { color: colors.textSecondary, marginTop: 1 }]}>
+                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+              </Text>
             </View>
-
-            {todayPlan ? (
-              <View style={styles.mealsList}>
-                {/* Breakfast */}
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => handleSelectMeal(todayPlan.meals.breakfast)}
-                  style={[styles.mealRow, { borderBottomColor: colors.border }]}
-                >
-                  <View style={styles.mealLeft}>
-                    <Text style={styles.mealEmoji}>🍳</Text>
-                    <View>
-                      <Text
-                        style={[
-                          styles.mealType,
-                          { color: "rgba(28, 25, 23, 0.6)" },
-                        ]}
-                      >
-                        Breakfast
-                      </Text>
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.mealTitle, { color: "#1C1917" }]}
-                      >
-                        {todayPlan.meals.breakfast?.title ||
-                          "No meal scheduled"}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={18}
-                    color="rgba(28, 25, 23, 0.4)"
-                  />
-                </TouchableOpacity>
-
-                {/* Lunch */}
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => handleSelectMeal(todayPlan.meals.lunch)}
-                  style={[styles.mealRow, { borderBottomColor: colors.border }]}
-                >
-                  <View style={styles.mealLeft}>
-                    <Text style={styles.mealEmoji}>🥗</Text>
-                    <View>
-                      <Text
-                        style={[
-                          styles.mealType,
-                          { color: "rgba(28, 25, 23, 0.6)" },
-                        ]}
-                      >
-                        Lunch
-                      </Text>
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.mealTitle, { color: "#1C1917" }]}
-                      >
-                        {todayPlan.meals.lunch?.title || "No meal scheduled"}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={18}
-                    color="rgba(28, 25, 23, 0.4)"
-                  />
-                </TouchableOpacity>
-
-                {/* Dinner */}
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => handleSelectMeal(todayPlan.meals.dinner)}
-                  style={styles.mealRow}
-                >
-                  <View style={styles.mealLeft}>
-                    <Text style={styles.mealEmoji}>🍛</Text>
-                    <View>
-                      <Text
-                        style={[
-                          styles.mealType,
-                          { color: "rgba(28, 25, 23, 0.6)" },
-                        ]}
-                      >
-                        Dinner
-                      </Text>
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.mealTitle, { color: "#1C1917" }]}
-                      >
-                        {todayPlan.meals.dinner?.title || "No meal scheduled"}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={18}
-                    color="rgba(28, 25, 23, 0.4)"
-                  />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.emptyPlanContainer}>
-                <Text
-                  style={[
-                    styles.emptyPlanText,
-                    { color: "rgba(28, 25, 23, 0.6)" },
-                  ]}
-                >
-                  Your culinary planner is empty today.
-                </Text>
-                <TouchableOpacity
-                  style={[styles.planWeeklyBtn, { backgroundColor: "#1C1917" }]}
-                  onPress={() => router.push("/(tabs)/planner")}
-                >
-                  <Text style={[styles.planWeeklyBtnText, { color: "white" }]}>
-                    Plan Weekly Meals
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </CardContainer>
-
-          {/* Row of 2 Medium/Small Cards */}
-          <View style={styles.row}>
-            {/* Ingredients Card */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => router.push("/(tabs)/pantry")}
-              style={{ flex: 1 }}
-            >
-              <CardContainer
-                gradient={ThemeGradients.cardGreen}
-                style={[styles.pantryCard, colors.cardShadow]}
-              >
-                <View
-                  style={[
-                    styles.iconWrapper,
-                    { backgroundColor: `rgba(28, 25, 23, 0.1)` },
-                  ]}
-                >
-                  <Ionicons
-                    name="restaurant-outline"
-                    size={24}
-                    color="#1C1917"
-                  />
-                </View>
-                <Text style={[styles.bentoLabel, { color: "#1C1917" }]}>
-                  What to Cook
-                </Text>
-                <Text
-                  style={[
-                    styles.bentoValue,
-                    { color: "rgba(28, 25, 23, 0.6)" },
-                  ]}
-                >
-                  Search by ingredients
-                </Text>
-                <Text style={[styles.bentoSubtext, { color: "#1C1917" }]}>
-                  What can I cook? →
-                </Text>
-              </CardContainer>
-            </TouchableOpacity>
-
-            {/* Scan Card */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => router.push("/(tabs)/capture")}
-              style={{ flex: 1 }}
-            >
-              <CardContainer
-                gradient={ThemeGradients.cardPurple}
-                style={[styles.scanCard, colors.cardShadow]}
-              >
-                <View
-                  style={[
-                    styles.iconWrapper,
-                    { backgroundColor: `rgba(28, 25, 23, 0.1)` },
-                  ]}
-                >
-                  <Ionicons name="scan-outline" size={24} color="#1C1917" />
-                </View>
-                <Text style={[styles.bentoLabel, { color: "#1C1917" }]}>
-                  Scan Recipe
-                </Text>
-                <Text
-                  style={[
-                    styles.bentoValue,
-                    { color: "rgba(28, 25, 23, 0.6)" },
-                  ]}
-                >
-                  From link or image
-                </Text>
-                <Text style={[styles.bentoSubtext, { color: "#1C1917" }]}>
-                  Extract with AI →
-                </Text>
-              </CardContainer>
-            </TouchableOpacity>
           </View>
 
-          {/* History/Cooking Memory Banner Card */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => router.push("/(tabs)/vault")}
-            style={{ width: "100%" }}
-          >
-            <CardContainer style={[styles.vaultCard, colors.cardShadow]}>
-              <View style={styles.vaultLeft}>
-                <View
-                  style={[
-                    styles.iconWrapper,
-                    { backgroundColor: `${colors.primaryAccent}1A` },
-                  ]}
-                >
-                  <Ionicons
-                    name="book-outline"
-                    size={22}
-                    color={colors.primaryAccent}
-                  />
+          {todayPlan ? (
+            <View style={styles.mealsList}>
+              {/* Breakfast */}
+              <TouchableOpacity
+                activeOpacity={0.6}
+                onPress={() => handleSelectMeal(todayPlan.meals.breakfast)}
+                style={[styles.mealRow, { borderBottomColor: colors.borderLight }]}
+              >
+                <View style={styles.mealLeft}>
+                  <Text style={styles.mealEmoji}>🍳</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[Typography.labelSmall, { color: colors.textTertiary }]}>
+                      BREAKFAST
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={[Typography.bodyMedium, { color: colors.textPrimary, marginTop: 2 }]}
+                    >
+                      {todayPlan.meals.breakfast?.title || "No meal scheduled"}
+                    </Text>
+                  </View>
                 </View>
-                <View>
-                  <Text
-                    style={[styles.bentoLabel, { color: colors.textPrimary }]}
-                  >
-                    Cooking Memory
-                  </Text>
-                  <Text
-                    style={[styles.bentoValue, { color: colors.textSecondary }]}
-                  >
-                    Review your timeline and history
-                  </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={colors.textTertiary}
+                />
+              </TouchableOpacity>
+
+              {/* Lunch */}
+              <TouchableOpacity
+                activeOpacity={0.6}
+                onPress={() => handleSelectMeal(todayPlan.meals.lunch)}
+                style={[styles.mealRow, { borderBottomColor: colors.borderLight }]}
+              >
+                <View style={styles.mealLeft}>
+                  <Text style={styles.mealEmoji}>🥗</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[Typography.labelSmall, { color: colors.textTertiary }]}>
+                      LUNCH
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={[Typography.bodyMedium, { color: colors.textPrimary, marginTop: 2 }]}
+                    >
+                      {todayPlan.meals.lunch?.title || "No meal scheduled"}
+                    </Text>
+                  </View>
                 </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={colors.textTertiary}
+                />
+              </TouchableOpacity>
+
+              {/* Dinner */}
+              <TouchableOpacity
+                activeOpacity={0.6}
+                onPress={() => handleSelectMeal(todayPlan.meals.dinner)}
+                style={styles.mealRow}
+              >
+                <View style={styles.mealLeft}>
+                  <Text style={styles.mealEmoji}>🍛</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[Typography.labelSmall, { color: colors.textTertiary }]}>
+                      DINNER
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={[Typography.bodyMedium, { color: colors.textPrimary, marginTop: 2 }]}
+                    >
+                      {todayPlan.meals.dinner?.title || "No meal scheduled"}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={colors.textTertiary}
+                />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.emptyPlanContainer}>
+              <View style={[styles.emptyIcon, { backgroundColor: colors.surfaceSecondary }]}>
+                <Ionicons name="restaurant-outline" size={28} color={colors.textTertiary} />
               </View>
-              <Ionicons
-                name="arrow-forward"
-                size={20}
-                color={colors.primaryAccent}
-              />
+              <Text
+                style={[Typography.body, { color: colors.textSecondary, textAlign: "center", marginTop: Spacing.md }]}
+              >
+                No meals planned for today
+              </Text>
+              <TouchableOpacity
+                style={[styles.planBtn, { backgroundColor: colors.primaryAccent }]}
+                onPress={() => router.push("/(tabs)/planner")}
+              >
+                <Text style={[Typography.buttonMedium, { color: "#FFFFFF" }]}>
+                  Plan Your Week
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </CardContainer>
+
+        {/* Quick Actions Grid */}
+        <Text style={[Typography.sectionTitle, { color: colors.textPrimary, marginTop: Spacing.xxl, marginBottom: Spacing.md }]}>
+          Quick Actions
+        </Text>
+        <View style={styles.actionsGrid}>
+          {quickActions.map((action, idx) => (
+            <CardContainer
+              key={idx}
+              style={styles.actionCard}
+              onPress={() => router.push(action.route)}
+            >
+              <View style={[styles.actionIconWrap, { backgroundColor: colors.primaryAccentMuted }]}>
+                <Ionicons name={action.icon} size={22} color={colors.primaryAccent} />
+              </View>
+              <Text style={[Typography.label, { color: colors.textPrimary, marginTop: Spacing.sm }]}>
+                {action.label}
+              </Text>
+              <Text style={[Typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
+                {action.desc}
+              </Text>
             </CardContainer>
-          </TouchableOpacity>
+          ))}
         </View>
+
+        {/* Cooking Memory Banner */}
+        <CardContainer
+          style={styles.memoryCard}
+          onPress={() => router.push("/(tabs)/vault")}
+        >
+          <View style={styles.memoryLeft}>
+            <View style={[styles.memoryIconWrap, { backgroundColor: colors.primaryAccentMuted }]}>
+              <Ionicons name="book-outline" size={20} color={colors.primaryAccent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[Typography.cardTitle, { color: colors.textPrimary }]}>
+                Cooking Memory
+              </Text>
+              <Text style={[Typography.caption, { color: colors.textSecondary }]}>
+                Review your timeline and history
+              </Text>
+            </View>
+          </View>
+          <Ionicons
+            name="arrow-forward"
+            size={18}
+            color={colors.textTertiary}
+          />
+        </CardContainer>
+
+        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: {
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.lg,
+  },
+  greetingContainer: {
     flex: 1,
   },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 120,
-  },
-
   avatarBtn: {
     width: 44,
     height: 44,
@@ -367,34 +329,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
   },
-  premiumIndicator: {
+  premiumBadge: {
     position: "absolute",
     bottom: -2,
     right: -2,
-    backgroundColor: "#000",
     borderRadius: 8,
-    padding: 2,
-    borderWidth: 1,
-    borderColor: "#FFCC00",
+    padding: 3,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
   },
-  grid: {
-    width: "100%",
-    gap: 10,
+  scrollContent: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: 40,
   },
+
+  // Today's Plan
   todayCard: {
-    padding: 20,
-    borderRadius: 28,
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
   },
-  cardHeader: {
+  todayHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginBottom: 16,
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    letterSpacing: -0.3,
+  todayIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
+    alignItems: "center",
+    justifyContent: "center",
   },
   mealsList: {
     width: "100%",
@@ -403,96 +368,76 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 12,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
   },
   mealLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: Spacing.md,
     flex: 1,
   },
   mealEmoji: {
-    fontSize: 22,
-  },
-  mealType: {
-    fontSize: 10,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  mealTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    marginTop: 2,
-    maxWidth: "85%",
+    fontSize: 24,
   },
   emptyPlanContainer: {
     alignItems: "center",
-    paddingVertical: 16,
+    paddingVertical: Spacing.xl,
   },
-  emptyPlanText: {
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  planWeeklyBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  planWeeklyBtnText: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  row: {
-    flexDirection: "row",
-    gap: 16,
-  },
-  pantryCard: {
-    padding: 16,
-    borderRadius: 28,
-    height: 180,
-    justifyContent: "space-between",
-  },
-  scanCard: {
-    padding: 16,
-    borderRadius: 28,
-    height: 180,
-    justifyContent: "space-between",
-  },
-  iconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
   },
-  bentoLabel: {
-    fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: -0.3,
-    marginTop: 8,
+  planBtn: {
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm + 2,
+    borderRadius: Radius.md,
+    marginTop: Spacing.lg,
   },
-  bentoValue: {
-    fontSize: 13,
-    marginTop: 2,
+
+  // Quick Actions
+  actionsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.md,
   },
-  bentoSubtext: {
-    fontSize: 11,
-    fontWeight: "700",
-    marginTop: 6,
+  actionCard: {
+    width: "47%",
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    flexGrow: 1,
   },
-  vaultCard: {
+  actionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Memory Card
+  memoryCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
-    borderRadius: 24,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.lg,
   },
-  vaultLeft: {
+  memoryLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: Spacing.md,
+    flex: 1,
+  },
+  memoryIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
