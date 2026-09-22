@@ -1,56 +1,61 @@
-# Welcome to your Expo app 👋
+# RecipeFetchAI
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+An AI-powered mobile app that turns a photo of your ingredients (or pantry) into a full recipe, meal plan, and shopping/pantry tracker.
 
-## Get started
+## Overview
 
-1. Install dependencies
+RecipeFetchAI is a React Native (Expo) app where a user photographs ingredients, a receipt, or a dish, and Google Gemini extracts a structured recipe (ingredients, instructions, metrics) from the image or text. Recipes can also be entered manually. The app then layers pantry tracking, a meal planner, a recipe vault, and a guided step-by-step "cook mode" on top of that core extraction feature, with Firebase for auth/data and RevenueCat for subscriptions.
 
-   ```bash
-   npm install
-   ```
+## Problem it solves
 
-2. Start the app
+Turning "a photo of what's in your fridge" or a messy recipe screenshot into something actually cookable normally requires manual transcription. RecipeFetchAI automates that extraction step with an LLM, then keeps the extracted recipe useful — tracked against what's actually in your pantry, plannable into a weekly meal plan, and walkable via a distraction-free cook mode — rather than just being a one-off AI chat answer.
 
-   ```bash
-   npx expo start
-   ```
+## Key features
 
-In the output, you'll find options to open the app in a
+- **AI recipe extraction from photos** (`src/app/(tabs)/capture.tsx`, `src/services/gemini.ts`): capture or pick an image, extract a structured recipe (`extractRecipe`) via Gemini
+- **Model cascade with fallback**: `gemini.ts` walks a list of Gemini model versions (`gemini-2.5-flash` → `gemini-2.0-flash-lite`, etc.) and retries on failure, plus a cloud-proxy fallback path, so a single model outage or rate limit doesn't break extraction
+- **Manual recipe entry** (`manual-recipe.tsx`, `ManualIngredientForm.tsx`, `ManualInstructionForm.tsx`) as a fallback/alternative to AI extraction, with the same formatting/calculation pipeline
+- **Pantry tracking** (`(tabs)/pantry.tsx`, `pantrySlice.ts`) and **ingredient matching** (`match-results.tsx`) against recipes
+- **Meal planner** (`(tabs)/planner.tsx`, `plannerSlice.ts`, `meal-plan-detail.tsx`) and a **recipe vault** ((tabs)/vault.tsx`) for saved recipes
+- **Guided cook mode** (`CookModeModal.tsx`) — step-by-step recipe walkthrough
+- **Diet/preferences onboarding** (`onboarding.tsx`, `setup-diet.tsx`, `setup-pantry.tsx`, `preferences.tsx`) that personalizes recipe generation
+- **Subscription paywall** via RevenueCat (`react-native-purchases`, `subscriptionSlice.ts`, `paywall.tsx`), including free-scan usage tracking with monthly rollover
+- **Firebase-backed auth and storage** (`services/firebase.ts`, `services/storage.ts`)
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## What's unique about it
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- Recipe extraction isn't a single API call — `gemini.ts` implements a resilient multi-model cascade with retry/fallback logic (including a secondary cloud proxy path) specifically so image-to-recipe extraction stays reliable across Gemini model deprecations and rate limits.
+- The AI output feeds directly into operational features (pantry match, meal planning, cook mode) rather than being the end product itself — extraction is the input to a broader kitchen workflow, not a standalone "ask AI" screen.
 
-## Get a fresh project
+## Tech stack
 
-When you're ready, run:
+- **Framework**: React Native + Expo (Expo Router, file-based routing), TypeScript
+- **AI**: Google Gemini (`@google/generative-ai`), multi-model cascade with fallback
+- **State**: Redux Toolkit + `redux-persist`
+- **Backend-as-a-service**: Firebase (auth, Firestore)
+- **Payments**: RevenueCat (`react-native-purchases`, `react-native-purchases-ui`)
+- **UI**: `expo-image`, `expo-blur`/`expo-glass-effect`, `react-native-reanimated`, `react-native-gesture-handler`
+- **Build/deploy**: EAS (`eas.json`, `eas-cli`)
+
+## Setup / running instructions
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Copy `.env.example` to `.env` and fill in:
+- `EXPO_PUBLIC_GEMINI_API_KEY` — Google Gemini API key
+- `EXPO_PUBLIC_FIREBASE_*` — Firebase client SDK config
+- `EXPO_PUBLIC_REVENUECAT_*` — RevenueCat API keys (Android/iOS)
 
-### Other setup steps
+Start the app:
+```bash
+npm run start      # expo start
+npm run android     # expo run:android
+npm run ios          # expo run:ios
+npm run web            # expo start --web
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Other scripts: `npm run lint` (expo lint), `npm run reset-project` (moves starter code to `app-example` and resets `app/`).
 
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Builds are managed via EAS (`eas.json` profiles: development/preview/production).
